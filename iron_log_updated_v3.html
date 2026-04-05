@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>IRON LOG</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:#0d0d0d; --panel:#141414; --sidebar:#111111;
+      --border:#2a2a2a; --accent:#e8ff47; --accent2:#ff4747;
+      --text:#f0f0f0; --muted:#555; --entry-bg:#1a1a1a;
+      --active:#1e1e1e; --sidebar-w:220px;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'DM Mono',monospace;background:var(--bg);color:var(--text);height:100vh;display:flex;overflow:hidden;font-size:13px}
+
+    #sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:.25s;position:relative;z-index:10}
+    #sidebar.collapsed{width:0;min-width:0;border-right-color:transparent}
+    #sidebar-header{padding:24px 16px 16px;border-bottom:1px solid var(--border);white-space:nowrap}
+    #sidebar-header h1{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:3px;color:var(--accent);line-height:1}
+    #sidebar-header p{color:var(--muted);font-size:10px;letter-spacing:1px;margin-top:4px}
+    #muscle-list{flex:1;overflow-y:auto;padding:8px 0}
+    .muscle-item{display:flex;align-items:center;gap:8px;padding:11px 16px;cursor:pointer;border-left:3px solid transparent;transition:.15s;white-space:nowrap}
+    .muscle-item:hover,.muscle-item.active{background:var(--active)}
+    .muscle-item.active{border-left-color:var(--accent)}
+    .muscle-item .muscle-name{flex:1;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;font-weight:500}
+    .muscle-item.active .muscle-name{color:var(--accent)}
+    .edit-btn{opacity:0;background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:2px 5px;transition:.15s;flex-shrink:0}
+    .muscle-item:hover .edit-btn{opacity:1}
+    .edit-btn:hover{color:var(--accent)}
+    .muscle-name-input{background:none;border:none;border-bottom:1px solid var(--accent);color:var(--accent);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;font-weight:500;width:100%;outline:none;padding:1px 0}
+    #add-muscle-btn{margin:8px 14px 16px;background:none;border:1px dashed var(--border);color:var(--muted);padding:8px;cursor:pointer;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;transition:.15s;border-radius:2px}
+    #add-muscle-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+    #main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);min-width:0}
+    #top-bar{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;flex-shrink:0}
+    #menu-toggle{background:none;border:1px solid var(--border);color:var(--text);cursor:pointer;padding:8px 10px;border-radius:2px;display:flex;flex-direction:column;gap:4px;flex-shrink:0;transition:.15s}
+    #menu-toggle:hover{border-color:var(--accent)}
+    #menu-toggle span{display:block;width:16px;height:1.5px;background:var(--text)}
+    #top-bar-center{flex:1;display:flex;align-items:center;justify-content:space-between;min-width:0}
+    #group-label-wrap{min-width:0}
+    #main-title{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:4px;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #main-subtitle{color:var(--muted);font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-top:3px}
+    #no-group-hint{color:var(--muted);font-size:11px;letter-spacing:2px;text-transform:uppercase}
+
+    #content-wrap{flex:1;overflow-y:auto;padding:24px;display:none;position:relative}
+#progress-toast{position:sticky;top:0;z-index:30;display:none;margin:0 auto 14px;max-width:420px;background:var(--panel);border:1px solid var(--accent);color:var(--accent);padding:10px 12px;border-radius:4px;font-size:10px;letter-spacing:1px;text-transform:uppercase}
+    #content-wrap::-webkit-scrollbar{width:3px}
+    #content-wrap::-webkit-scrollbar-thumb{background:var(--border)}
+    #no-selection{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--muted)}
+    #no-selection .giant{font-family:'Bebas Neue',sans-serif;font-size:80px;color:#1a1a1a;letter-spacing:8px}
+    #no-selection p{font-size:11px;letter-spacing:2px;text-transform:uppercase}
+
+    .empty-state{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted)}
+    .empty-state p{font-size:11px;letter-spacing:2px;text-transform:uppercase}
+    .session-block{margin-bottom:24px;animation:fadeIn .2s ease}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+    .session-date{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:10px}
+    .session-date::after{content:'';flex:1;height:1px;background:var(--border)}
+    .exercise-card{background:var(--entry-bg);border:1px solid var(--border);border-radius:4px;margin-bottom:8px;overflow:hidden}
+    .exercise-header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--border)}
+    .exercise-name{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;font-weight:500}
+    .delete-entry-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 6px;transition:.15s}
+    .delete-entry-btn:hover{color:var(--accent2)}
+    .sets-table{width:100%;border-collapse:collapse}
+    .sets-table th{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:6px 14px;text-align:left;font-weight:400}
+    .sets-table td{padding:6px 14px;font-size:13px;border-top:1px solid var(--border)}
+    .sets-table td:first-child{color:var(--muted);font-size:10px}
+
+    #draft-wrap{display:none;margin-bottom:24px}
+    .draft-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:10px}
+    .draft-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+    #center-actions{display:none;flex-direction:column;align-items:center;gap:10px;margin:8px 0 20px}
+    #fab-wrap{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px}
+    #fab-main{width:44px;height:44px;border-radius:999px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:28px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+    #fab-main:hover,#fab-main.open{border-color:var(--accent);color:var(--accent)}
+    #fab-menu{display:none;flex-direction:column;gap:8px;align-items:center}
+    #fab-menu.open{display:flex}
+    .action-btn{background:none;border:1px solid var(--border);color:var(--text);padding:8px 12px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;border-radius:2px;cursor:pointer;transition:.15s;min-width:210px}
+    .action-btn:hover{border-color:var(--accent);color:var(--accent)}
+    #end-session-outside{display:none}
+
+    #session-form-wrap{display:none;background:var(--panel);border:1px solid var(--border);border-radius:4px;max-width:420px;width:100%;margin:0 auto 20px}
+    #session-form-wrap.open{display:block}
+    #form-inner{padding:16px 18px 18px}
+    #form-inner h3{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--accent);margin-bottom:14px;text-align:center}
+    .date-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+    .date-row label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);flex-shrink:0}
+    .text-input,.num-input,#input-date{background:var(--entry-bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;font-family:'DM Mono',monospace;font-size:16px;outline:none;border-radius:2px;transition:.15s;width:100%}
+    .text-input:focus,.num-input:focus,#input-date:focus{border-color:var(--accent)}
+    #exercise-name-input{margin-bottom:12px}
+    #sets-detail{margin-bottom:14px}
+    .set-row{display:grid;grid-template-columns:44px 1fr 1fr;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
+    .set-row:last-child{border-bottom:none}
+    .set-label{font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase}
+    .mini-field{display:flex;flex-direction:column;gap:5px}
+    .mini-field label{font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase}
+    .top-row{display:grid;grid-template-columns:70px 1fr;gap:12px;margin-bottom:12px}
+    .field-block{display:flex;flex-direction:column;gap:5px}
+    .field-block label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+#sets-count-input::-webkit-outer-spin-button,#sets-count-input::-webkit-inner-spin-button,.reps-input::-webkit-outer-spin-button,.reps-input::-webkit-inner-spin-button,.weight-input::-webkit-outer-spin-button,.weight-input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+#sets-count-input,.reps-input,.weight-input{-moz-appearance:textfield;}
+    #form-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+    .primary-btn{background:var(--accent);color:#000;border:none;padding:10px 16px;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;letter-spacing:1px;cursor:pointer;border-radius:2px;transition:.15s}
+    .primary-btn:hover{background:#fff}
+    .secondary-btn{background:none;border:1px solid var(--border);color:var(--text);padding:10px 16px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;cursor:pointer;border-radius:2px;transition:.15s}
+    .secondary-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+    @media (max-width:700px){
+      #content-wrap{padding:16px}
+      #session-form-wrap{max-width:none}
+      .set-row{grid-template-columns:1fr;gap:8px}
+      .set-label{margin-bottom:4px}
+      .action-btn{min-width:180px}
+    }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <div id="sidebar-header"><h1>IRON<br>LOG</h1><p>GYM PROGRESSION</p></div>
+    <div id="muscle-list"></div>
+    <button id="add-muscle-btn">+ Add Group</button>
+  </div>
+
+  <div id="main">
+    <div id="top-bar">
+      <button id="menu-toggle" title="Toggle menu"><span></span><span></span><span></span></button>
+      <div id="top-bar-center">
+        <div id="group-label-wrap">
+          <div id="no-group-hint">Select a group</div>
+          <div id="group-info" style="display:none">
+            <div id="main-title"></div>
+            <div id="main-subtitle"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="no-selection">
+      <div class="giant">LIFT</div>
+      <p>Open the menu and pick a muscle group</p>
+    </div>
+
+    <div id="content-wrap">
+      <div id="progress-toast"></div>
+      <div id="draft-wrap">
+        <div class="draft-label">Current Session</div>
+        <div id="draft-area"></div>
+      </div>
+
+      <div id="log-area"></div>
+
+      <div id="center-actions">
+        <div id="fab-wrap">
+          <button id="fab-main" title="Exercise actions">+</button>
+          <div id="fab-menu">
+            <button class="action-btn" id="next-exercise-action">Add Exercise</button>
+            <button class="action-btn" id="duplicate-exercise-action">Duplicate Last Exercise</button>
+            <button class="action-btn" id="duplicate-session-action">Duplicate Last Session</button>
+          </div>
+          <button class="action-btn" id="end-session-outside">End Session</button>
+        </div>
+      </div>
+
+      <div id="session-form-wrap">
+        <div id="form-inner">
+          <h3>LOG EXERCISE</h3>
+          <div class="date-row">
+            <label>Date</label>
+            <input type="date" id="input-date">
+          </div>
+          <input type="text" id="exercise-name-input" class="text-input" placeholder="">
+          <div class="top-row">
+            <div class="field-block">
+              <label>Sets</label>
+              <input type="number" id="sets-count-input" class="num-input" min="1" max="20" value="">
+            </div>
+            <div></div>
+          </div>
+          <div id="sets-detail"></div>
+          <div id="form-actions">
+            <button id="log-btn" class="primary-btn">Save Exercise</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const DEFAULT_GROUPS = [
+      {id:'chest',name:'Chest'},{id:'back',name:'Back'},{id:'shoulders',name:'Shoulders'},
+      {id:'arms',name:'Arms'},{id:'legs',name:'Legs'},{id:'core',name:'Core'}
+    ];
+
+    function loadState(){
+      try{
+        return {
+          groups: JSON.parse(localStorage.getItem('ironlog_groups')||'null') || DEFAULT_GROUPS,
+          logs: JSON.parse(localStorage.getItem('ironlog_logs')||'{}'),
+          drafts: JSON.parse(localStorage.getItem('ironlog_drafts')||'{}')
+        };
+      }catch{ return {groups:DEFAULT_GROUPS,logs:{},drafts:{}}; }
+    }
+    function saveState(){
+      localStorage.setItem('ironlog_groups', JSON.stringify(state.groups));
+      localStorage.setItem('ironlog_logs', JSON.stringify(state.logs));
+      localStorage.setItem('ironlog_drafts', JSON.stringify(state.drafts));
+    }
+
+    const state = loadState();
+    let activeId = null;
+    let sidebarOpen = true;
+
+    const els = {
+      sidebar: document.getElementById('sidebar'),
+      muscleList: document.getElementById('muscle-list'),
+      noSelection: document.getElementById('no-selection'),
+      contentWrap: document.getElementById('content-wrap'),
+      noGroupHint: document.getElementById('no-group-hint'),
+      groupInfo: document.getElementById('group-info'),
+      mainTitle: document.getElementById('main-title'),
+      mainSubtitle: document.getElementById('main-subtitle'),
+      logArea: document.getElementById('log-area'),
+      draftWrap: document.getElementById('draft-wrap'),
+      draftArea: document.getElementById('draft-area'),
+      centerActions: document.getElementById('center-actions'),
+      fabMain: document.getElementById('fab-main'),
+      fabMenu: document.getElementById('fab-menu'),
+      duplicateSessionAction: document.getElementById('duplicate-session-action'),
+      endSessionOutside: document.getElementById('end-session-outside'),
+      formWrap: document.getElementById('session-form-wrap'),
+      inputDate: document.getElementById('input-date'),
+      exerciseInput: document.getElementById('exercise-name-input'),
+      setsCountInput: document.getElementById('sets-count-input'),
+      setsDetail: document.getElementById('sets-detail'),
+      progressToast: document.getElementById('progress-toast')
+    };
+
+    function todayString(){ return new Date().toISOString().split('T')[0]; }
+    function getDraft(){ return activeId ? (state.drafts[activeId] || null) : null; }
+    function ensureDraft(date){
+      if (!activeId) return null;
+      if (!state.drafts[activeId]) {
+        state.drafts[activeId] = { date: date || todayString(), exercises: [] };
+      }
+      if (date) state.drafts[activeId].date = date;
+      return state.drafts[activeId];
+    }
+    function clearDraft(){
+      if (!activeId) return;
+      delete state.drafts[activeId];
+      saveState();
+    }
+    function getSavedLogs(){ return state.logs[activeId] || []; }
+    function getLatestSavedDate(){
+      const logs = getSavedLogs();
+      if (!logs.length) return null;
+      return logs.map(x => x.date || '').sort().pop() || null;
+    }
+    function getLatestSavedSessionEntries(){
+      const latestDate = getLatestSavedDate();
+      if (!latestDate) return [];
+      return getSavedLogs().filter(x => x.date === latestDate);
+    }
+    function getLastExerciseSource(){
+      const draft = getDraft();
+      if (draft && draft.exercises.length) return draft.exercises[draft.exercises.length - 1];
+      const logs = getSavedLogs();
+      return logs.length ? logs[logs.length - 1] : null;
+    }
+    function formatDate(date){
+      if (!date || date === 'No date') return 'No date';
+      return new Date(date + 'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'long',day:'numeric',year:'numeric'});
+    }
+
+    function showProgressToast(message){
+      if (!message) return;
+      els.progressToast.textContent = message;
+      els.progressToast.style.display = 'block';
+      clearTimeout(showProgressToast._timer);
+      showProgressToast._timer = setTimeout(() => {
+        els.progressToast.style.display = 'none';
+      }, 3500);
+    }
+    function hideProgressToast(){
+      els.progressToast.style.display = 'none';
+      clearTimeout(showProgressToast._timer);
+    }
+    function findPreviousExercise(exerciseName){
+      const logs = getSavedLogs();
+      for (let i = logs.length - 1; i >= 0; i--) {
+        if ((logs[i].exercise || '').trim().toLowerCase() === (exerciseName || '').trim().toLowerCase()) {
+          return logs[i];
+        }
+      }
+      return null;
+    }
+    function getProgressMessage(exerciseName, sets){
+      const prev = findPreviousExercise(exerciseName);
+      if (!prev || !prev.sets || !prev.sets.length) return '';
+      const improvements = [];
+      let weightUp = false;
+      let repsUp = false;
+      sets.forEach((s, i) => {
+        const prevSet = prev.sets[i] || {};
+        const newWeight = parseFloat(s.weight || 0);
+        const oldWeight = parseFloat(prevSet.weight || 0);
+        const newReps = parseFloat(s.reps || 0);
+        const oldReps = parseFloat(prevSet.reps || 0);
+        if (newWeight > oldWeight) weightUp = true;
+        if (newReps > oldReps) repsUp = true;
+      });
+      if (!weightUp && !repsUp) return '';
+      if (weightUp) improvements.push('weight up');
+      if (repsUp) improvements.push('reps up');
+      return `${exerciseName.toUpperCase()} PROGRESSION: ${improvements.join(' + ')}`;
+    }
+
+    function renderSidebar(){
+      els.muscleList.innerHTML = '';
+      state.groups.forEach(g => {
+        const item = document.createElement('div');
+        item.className = 'muscle-item' + (g.id===activeId ? ' active' : '');
+        item.dataset.id = g.id;
+        item.innerHTML = `<span class="muscle-name">${g.name}</span><button class="edit-btn" title="Rename">✎</button>`;
+        item.addEventListener('click', e => {
+          if (e.target.classList.contains('edit-btn')) return;
+          setActive(g.id);
+          closeSidebar();
+        });
+        item.querySelector('.edit-btn').addEventListener('click', e => {
+          e.stopPropagation();
+          startRename(g.id, item);
+        });
+        els.muscleList.appendChild(item);
+      });
+    }
+
+    function startRename(id, item){
+      const nameEl = item.querySelector('.muscle-name');
+      const group = state.groups.find(g => g.id===id);
+      const input = document.createElement('input');
+      input.className = 'muscle-name-input';
+      input.value = group.name;
+      nameEl.replaceWith(input);
+      input.focus();
+      input.select();
+      function finish(){
+        const val = input.value.trim();
+        if (val) {
+          group.name = val;
+          saveState();
+          if (id===activeId) els.mainTitle.textContent = val.toUpperCase();
+        }
+        renderSidebar();
+      }
+      input.addEventListener('blur', finish);
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') input.blur();
+        if (e.key === 'Escape') { input.value = group.name; input.blur(); }
+      });
+    }
+
+    function setActive(id){
+      activeId = id;
+      closeFabMenu();
+      hideForm();
+      renderSidebar();
+      renderMain();
+    }
+
+    function renderMain(){
+      const group = state.groups.find(g => g.id===activeId);
+      if (!group){
+        hideProgressToast();
+        els.noSelection.style.display = 'flex';
+        els.contentWrap.style.display = 'none';
+        els.noGroupHint.style.display = 'block';
+        els.groupInfo.style.display = 'none';
+        return;
+      }
+      els.noSelection.style.display = 'none';
+      els.contentWrap.style.display = 'block';
+      els.noGroupHint.style.display = 'none';
+      els.groupInfo.style.display = 'block';
+      const logs = state.logs[activeId] || [];
+      els.mainTitle.textContent = group.name.toUpperCase();
+      els.mainSubtitle.textContent = `${logs.length} entr${logs.length===1?'y':'ies'} logged`;
+      renderDraft();
+      renderLog();
+      renderActionState();
+      els.centerActions.style.display = 'flex';
+    }
+
+    function renderActionState(){
+      const draft = getDraft();
+      const selectedDate = els.inputDate.value || draft?.date || todayString();
+      const latestSavedDate = getLatestSavedDate();
+      const canDuplicateSession = !!latestSavedDate && selectedDate !== latestSavedDate && !(draft && draft.exercises.length);
+      els.duplicateSessionAction.style.display = canDuplicateSession ? 'block' : 'none';
+      els.endSessionOutside.style.display = (draft && draft.exercises.length) ? 'block' : 'none';
+    }
+
+    function makeExerciseCard(entry, idsForDelete, isDraft=false){
+      let html = `<div class="exercise-card"><div class="exercise-header"><span class="exercise-name">${entry.exercise || ''}</span>`;
+      if (idsForDelete) html += `<button class="delete-entry-btn" data-ids="${idsForDelete}">✕</button>`;
+      html += `</div><table class="sets-table"><tr><th>Set</th><th>Reps</th><th>Weight</th></tr>`;
+      (entry.sets || []).forEach((s,i) => {
+        html += `<tr><td>${i+1}</td><td>${s.reps || ''}</td><td>${s.weight || ''}${s.weight ? ' lbs' : ''}</td></tr>`;
+      });
+      html += `</table></div>`;
+      const wrap = document.createElement('div');
+      wrap.innerHTML = html;
+      if (isDraft) wrap.firstChild.style.opacity = '0.96';
+      return wrap.firstChild;
+    }
+
+    function renderDraft(){
+      const draft = getDraft();
+      if (!draft || !draft.exercises.length){
+        els.draftWrap.style.display = 'none';
+        els.draftArea.innerHTML = '';
+        return;
+      }
+      els.draftWrap.style.display = 'block';
+      els.draftArea.innerHTML = `<div class="session-date">${formatDate(draft.date)}</div>`;
+      draft.exercises.forEach((entry, index) => {
+        const card = makeExerciseCard(entry, '', true);
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-entry-btn';
+        deleteBtn.textContent = '✕';
+        deleteBtn.addEventListener('click', () => {
+          draft.exercises.splice(index, 1);
+          if (!draft.exercises.length) delete state.drafts[activeId];
+          saveState();
+          renderMain();
+        });
+        card.querySelector('.exercise-header').appendChild(deleteBtn);
+        els.draftArea.appendChild(card);
+      });
+    }
+
+    function renderLog(){
+      const logs = getSavedLogs().slice().reverse();
+      if (!logs.length){
+        els.logArea.innerHTML = `<div class="empty-state"><p>No saved sessions yet</p></div>`;
+        return;
+      }
+      const byDate = {};
+      logs.forEach(entry => {
+        const d = entry.date || 'No date';
+        const ex = entry.exercise || 'Exercise';
+        if (!byDate[d]) byDate[d] = {};
+        if (!byDate[d][ex]) byDate[d][ex] = [];
+        byDate[d][ex].push(entry);
+      });
+      els.logArea.innerHTML = '';
+      Object.keys(byDate).sort((a,b)=>b.localeCompare(a)).forEach(date => {
+        const block = document.createElement('div');
+        block.className = 'session-block';
+        let html = `<div class="session-date">${formatDate(date)}</div>`;
+        Object.keys(byDate[date]).forEach(exName => {
+          const entries = byDate[date][exName];
+          html += `<div class="exercise-card"><div class="exercise-header"><span class="exercise-name">${exName}</span><button class="delete-entry-btn" data-ids="${entries.map(e=>e.id).join(',')}">✕</button></div><table class="sets-table"><tr><th>Set</th><th>Reps</th><th>Weight</th></tr>`;
+          entries.forEach(entry => {
+            (entry.sets || []).forEach((s,i) => {
+              html += `<tr><td>${i+1}</td><td>${s.reps || ''}</td><td>${s.weight || ''}${s.weight ? ' lbs' : ''}</td></tr>`;
+            });
+          });
+          html += `</table></div>`;
+        });
+        block.innerHTML = html;
+        block.querySelectorAll('.delete-entry-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const ids = btn.dataset.ids.split(',');
+            state.logs[activeId] = (state.logs[activeId]||[]).filter(e => !ids.includes(e.id));
+            saveState();
+            renderMain();
+          });
+        });
+        els.logArea.appendChild(block);
+      });
+    }
+
+    function attachWheelInput(input){
+      input.addEventListener('wheel', e => {
+        e.preventDefault();
+        const step = e.deltaY > 0 ? -1 : 1;
+        const current = parseInt(input.value || '0', 10);
+        input.value = Math.max(0, current + step);
+      }, {passive:false});
+    }
+
+    function buildSetRow(index, values={}){
+      const row = document.createElement('div');
+      row.className = 'set-row';
+      row.innerHTML = `
+        <div class="set-label">Set ${index + 1}</div>
+        <div class="mini-field">
+          <label>Reps</label>
+          <input type="number" class="num-input reps-input" min="0" max="999" value="${values.reps ?? ''}" placeholder="">
+        </div>
+        <div class="mini-field">
+          <label>Weight (lbs)</label>
+          <input type="number" class="num-input weight-input" min="0" max="9999" value="${values.weight ?? ''}" placeholder="">
+        </div>`;
+      const repsInput = row.querySelector('.reps-input');
+      const weightInput = row.querySelector('.weight-input');
+      attachWheelInput(repsInput);
+      attachWheelInput(weightInput);
+      return row;
+    }
+
+    function buildSetsDetail(count, template=null){
+      const existing = [...els.setsDetail.querySelectorAll('.set-row')].map(row => ({
+        reps: row.querySelector('.reps-input')?.value || '',
+        weight: row.querySelector('.weight-input')?.value || ''
+      }));
+      els.setsDetail.innerHTML = '';
+      for (let i = 0; i < count; i++) {
+        const values = template ? (template[i] || {}) : (existing[i] || {});
+        els.setsDetail.appendChild(buildSetRow(i, values));
+      }
+    }
+
+    function showForm(){
+      els.formWrap.classList.add('open');
+      closeFabMenu();
+      renderActionState();
+    }
+    function hideForm(){ els.formWrap.classList.remove('open'); }
+    function toggleFabMenu(){ els.fabMain.classList.toggle('open'); els.fabMenu.classList.toggle('open'); }
+    function closeFabMenu(){ els.fabMain.classList.remove('open'); els.fabMenu.classList.remove('open'); }
+    function closeSidebar(){ sidebarOpen = false; els.sidebar.classList.add('collapsed'); }
+
+    function openBlankExercise(){
+      const draft = ensureDraft(els.inputDate.value || getDraft()?.date || todayString());
+      els.inputDate.value = draft.date;
+      els.exerciseInput.value = '';
+      els.setsCountInput.value = '';
+      buildSetsDetail(0, []);
+      showForm();
+      els.exerciseInput.focus();
+    }
+
+    function duplicateLastExercise(){
+      const source = getLastExerciseSource();
+      if (!source) { openBlankExercise(); return; }
+      const draft = ensureDraft(els.inputDate.value || getDraft()?.date || todayString());
+      els.inputDate.value = draft.date;
+      els.exerciseInput.value = source.exercise || '';
+      const template = (source.sets || []).map(() => ({reps:'', weight:''}));
+      const count = template.length || 0;
+      els.setsCountInput.value = count ? String(count) : '';
+      buildSetsDetail(count, template);
+      showForm();
+      els.exerciseInput.focus();
+      els.exerciseInput.select();
+    }
+
+    function duplicateLastSession(){
+      const latestDate = getLatestSavedDate();
+      if (!latestDate) { openBlankExercise(); return; }
+      const draftDate = els.inputDate.value || todayString();
+      if (draftDate === latestDate) return;
+      const latestEntries = getLatestSavedSessionEntries();
+      if (!latestEntries.length) return;
+      state.drafts[activeId] = {
+        date: draftDate,
+        exercises: latestEntries.map(entry => ({
+          id: 'draft_' + Date.now().toString() + '_' + Math.random().toString(36).slice(2,7),
+          exercise: entry.exercise || '',
+          sets: (entry.sets || []).map(() => ({reps:'', weight:''}))
+        }))
+      };
+      saveState();
+      hideForm();
+      renderMain();
+    }
+
+    function saveCurrentExercise(){
+      if (!activeId) return;
+      const exercise = els.exerciseInput.value.trim();
+      if (!exercise) { els.exerciseInput.focus(); return; }
+      const rows = [...els.setsDetail.querySelectorAll('.set-row')];
+      if (!rows.length) { els.setsCountInput.focus(); return; }
+      const sets = rows.map(row => ({
+        reps: row.querySelector('.reps-input').value,
+        weight: row.querySelector('.weight-input').value
+      }));
+      const draft = ensureDraft(els.inputDate.value || todayString());
+      draft.date = els.inputDate.value || draft.date || todayString();
+      draft.exercises.push({
+        id: 'draft_' + Date.now().toString(),
+        exercise,
+        sets
+      });
+      saveState();
+      const progressMessage = getProgressMessage(exercise, sets);
+      hideForm();
+      renderMain();
+      showProgressToast(progressMessage);
+    }
+
+    function endSession(){
+      const draft = getDraft();
+      if (!draft || !draft.exercises.length) return;
+      if (!state.logs[activeId]) state.logs[activeId] = [];
+      draft.exercises.forEach(ex => {
+        state.logs[activeId].push({
+          id: 'log_' + Date.now().toString() + '_' + Math.random().toString(36).slice(2,7),
+          date: draft.date,
+          exercise: ex.exercise,
+          sets: ex.sets
+        });
+      });
+      delete state.drafts[activeId];
+      saveState();
+      hideForm();
+      sidebarOpen = true;
+      els.sidebar.classList.remove('collapsed');
+      renderMain();
+    }
+
+    document.getElementById('menu-toggle').addEventListener('click', () => {
+      sidebarOpen = !sidebarOpen;
+      els.sidebar.classList.toggle('collapsed', !sidebarOpen);
+    });
+    els.fabMain.addEventListener('click', toggleFabMenu);
+    document.getElementById('next-exercise-action').addEventListener('click', openBlankExercise);
+    document.getElementById('duplicate-exercise-action').addEventListener('click', duplicateLastExercise);
+    document.getElementById('duplicate-session-action').addEventListener('click', duplicateLastSession);
+    document.getElementById('end-session-outside').addEventListener('click', endSession);
+    els.setsCountInput.addEventListener('input', () => {
+      const raw = els.setsCountInput.value.trim();
+      if (raw === '') {
+        els.setsDetail.innerHTML = '';
+        return;
+      }
+      let count = parseInt(raw, 10);
+      if (Number.isNaN(count)) {
+        els.setsDetail.innerHTML = '';
+        return;
+      }
+      count = Math.max(1, Math.min(20, count));
+      els.setsCountInput.value = count;
+      buildSetsDetail(count);
+    });
+    els.inputDate.addEventListener('input', renderActionState);
+
+    document.getElementById('log-btn').addEventListener('click', saveCurrentExercise);
+
+    document.getElementById('add-muscle-btn').addEventListener('click', () => {
+      const id = 'group_' + Date.now();
+      state.groups.push({id, name:'New Group'});
+      saveState();
+      renderSidebar();
+      setTimeout(() => {
+        const item = document.querySelector(`.muscle-item[data-id="${id}"]`);
+        if (item) startRename(id, item);
+      }, 50);
+    });
+
+    attachWheelInput(els.setsCountInput);
+    els.setsCountInput.value = '';
+    buildSetsDetail(0, []);
+    els.inputDate.value = todayString();
+    renderSidebar();
+    renderMain();
+  </script>
+</body>
+</html>
