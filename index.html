@@ -1,0 +1,1746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>IRON LOG</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0d0d0d;
+      --panel:#141414;
+      --sidebar:#111111;
+      --border:#2a2a2a;
+      --accent:#e8ff47;
+      --accent2:#ff4747;
+      --text:#f0f0f0;
+      --muted:#666;
+      --entry-bg:#1a1a1a;
+      --active:#1e1e1e;
+      --sidebar-w:220px;
+      --green:#7dff8a;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+    html,body{height:100%;overflow:auto;}
+    body{
+      font-family:'DM Mono',monospace;
+      background:var(--bg);
+      color:var(--text);
+      display:flex;
+      font-size:13px;
+      touch-action:manipulation;
+      -webkit-text-size-adjust:100%;
+    }
+    input,button,textarea,select{font:inherit;}
+    input[type="text"],input[type="number"],input[type="date"]{font-size:16px;}
+
+    #sidebar{
+      width:var(--sidebar-w);
+      min-width:var(--sidebar-w);
+      background:var(--sidebar);
+      border-right:1px solid var(--border);
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
+      transition:width .25s ease,min-width .25s ease,border-color .25s ease;
+      position:relative;z-index:10;
+      flex-shrink:0;
+    }
+    #sidebar.collapsed{width:0;min-width:0;border-right-color:transparent;}
+    #sidebar-header{padding:24px 16px 16px;border-bottom:1px solid var(--border);white-space:nowrap;}
+    #sidebar-header h1{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:3px;color:var(--accent);line-height:1;}
+    #sidebar-header p{color:var(--muted);font-size:10px;letter-spacing:1px;margin-top:4px;}
+    #muscle-list{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 0;}
+    #muscle-list::-webkit-scrollbar,#log-area::-webkit-scrollbar{width:3px;}
+    #muscle-list::-webkit-scrollbar-thumb,#log-area::-webkit-scrollbar-thumb{background:var(--border);}
+    .muscle-item{
+      display:flex;align-items:center;gap:8px;padding:11px 16px;cursor:pointer;border-left:3px solid transparent;
+      transition:background .15s,border-color .15s;white-space:nowrap;
+    }
+    .muscle-item:hover{background:var(--active);}
+    .muscle-item.active{background:var(--active);border-left-color:var(--accent);}
+    .muscle-name{flex:1;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;font-weight:500;}
+    .muscle-item.active .muscle-name{color:var(--accent);}
+    .side-actions{display:flex;align-items:center;gap:4px;opacity:0;transition:opacity .15s;}
+    .muscle-item:hover .side-actions{opacity:1;}
+    .icon-btn{
+      background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 5px;
+      transition:color .15s;flex-shrink:0;
+    }
+    .icon-btn:hover{color:var(--accent);}
+    .icon-btn.delete:hover{color:var(--accent2);}
+    .muscle-name-input{
+      background:none;border:none;border-bottom:1px solid var(--accent);color:var(--accent);
+      font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;
+      font-weight:500;width:100%;outline:none;padding:1px 0;
+    }
+    #add-muscle-btn{
+      margin:8px 14px 16px;background:none;border:1px dashed var(--border);color:var(--muted);
+      padding:8px;cursor:pointer;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;
+      text-transform:uppercase;transition:all .15s;border-radius:2px;white-space:nowrap;
+    }
+    #add-muscle-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+    #main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);min-width:0;}
+
+    #top-bar{
+      padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;
+      justify-content:space-between;gap:14px;flex-shrink:0;
+    }
+    #top-left{min-width:0;}
+    #no-group-hint{color:var(--muted);font-size:11px;letter-spacing:2px;text-transform:uppercase;}
+    #group-info{display:none;}
+    #main-title{
+      font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:4px;line-height:1;white-space:nowrap;
+      overflow:hidden;text-overflow:ellipsis;
+    }
+    #main-subtitle{color:var(--muted);font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-top:3px;}
+    #top-actions{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+    #session-progress{
+      color:var(--accent);font-size:10px;letter-spacing:2px;text-transform:uppercase;display:none;
+    }
+    #menu-toggle{
+      background:none;border:1px solid var(--border);color:var(--text);cursor:pointer;padding:8px 10px;border-radius:2px;
+      display:flex;flex-direction:column;gap:4px;flex-shrink:0;transition:border-color .15s;
+    }
+    #menu-toggle:hover{border-color:var(--accent);}
+    #menu-toggle span{display:block;width:16px;height:1.5px;background:var(--text);transition:background .15s;}
+    #menu-toggle:hover span{background:var(--accent);}
+
+    #content-wrap{flex:1;display:flex;flex-direction:column;min-height:0;overflow-y:auto;}
+    #no-selection{
+      flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--muted);
+    }
+    #no-selection .giant{font-family:'Bebas Neue',sans-serif;font-size:80px;color:#1a1a1a;letter-spacing:8px;}
+    #no-selection p{font-size:11px;letter-spacing:2px;text-transform:uppercase;}
+
+    #log-area{flex:1;overflow-y:auto;padding:24px;display:none;}
+    .empty-state{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);}
+    .empty-state p{font-size:11px;letter-spacing:2px;text-transform:uppercase;}
+
+    .session-block{margin-bottom:24px;animation:fadeIn .2s ease;}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+    .session-details{
+      background:var(--entry-bg);
+      border:1px solid var(--border);
+      border-radius:6px;
+      overflow:hidden;
+    }
+    .session-summary{
+      list-style:none;
+      cursor:pointer;
+      padding:12px 14px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      background:var(--panel);
+    }
+    .session-summary::-webkit-details-marker{display:none;}
+    .session-summary-left{
+      min-width:0;
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+    .session-date{
+      font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;
+      display:flex;align-items:center;gap:10px;
+    }
+    .session-date::after{content:'';flex:1;height:1px;background:var(--border);}
+    .session-meta{
+      font-size:10px;
+      letter-spacing:1px;
+      text-transform:uppercase;
+      color:var(--muted);
+    }
+    .session-chevron{
+      color:var(--muted);
+      font-size:16px;
+      transition:transform .15s ease,color .15s ease;
+      flex-shrink:0;
+    }
+    .session-details[open] .session-chevron{
+      transform:rotate(90deg);
+      color:var(--accent);
+    }
+    .session-content{
+      padding:12px 12px 4px;
+    }
+    .rejoin-session-btn{
+      width:auto;
+      min-width:140px;
+      margin-top:10px;
+    }
+    .exercise-card{background:var(--entry-bg);border:1px solid var(--border);border-radius:4px;margin-bottom:8px;overflow:hidden;}
+    .exercise-header{
+      display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--border);gap:12px;
+    }
+    .exercise-name{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;font-weight:500;min-width:0;flex:1;}
+    .exercise-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+    .edit-entry-btn,.delete-entry-btn{
+      background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 6px;transition:color .15s;
+    }
+    .edit-entry-btn:hover{color:var(--accent);}
+    .delete-entry-btn:hover{color:var(--accent2);}
+    .sets-table{width:100%;border-collapse:collapse;}
+    .sets-table th{
+      font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:6px 14px;text-align:left;font-weight:400;
+    }
+    .sets-table td{padding:6px 14px;font-size:13px;border-top:1px solid var(--border);vertical-align:top;}
+    .sets-table td:first-child{color:var(--muted);font-size:10px;}
+    .arm-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+    .arm-box{display:flex;gap:6px;align-items:center;white-space:nowrap;}
+    .arm-tag{font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;}
+    .progress-badge{
+      margin:0 14px 10px;
+      color:var(--green);
+      font-size:10px;
+      letter-spacing:1px;
+      text-transform:uppercase;
+    }
+
+    #composer-wrap{
+      border-top:1px solid var(--border);
+      background:linear-gradient(to top, var(--bg), var(--panel));
+      padding:14px 18px 18px;
+      flex-shrink:0;
+      width:100%;
+      overflow-y:auto;
+      -webkit-overflow-scrolling:touch;
+      padding-bottom:calc(24px + env(safe-area-inset-bottom));
+    }
+    #action-stack{
+      width:100%;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:10px;
+    }
+    #plus-wrap{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px;}
+    #plus-btn{
+      width:52px;height:52px;border-radius:50%;
+      border:1px solid var(--border);
+      background:var(--panel);color:var(--accent);
+      display:flex;align-items:center;justify-content:center;
+      font-size:34px;line-height:1;cursor:pointer;transition:.15s;
+    }
+    #plus-btn:hover{border-color:var(--accent);background:#181818;}
+    #plus-btn.open{transform:rotate(45deg);}
+    #plus-menu{
+      display:none;flex-direction:column;gap:8px;align-items:center;
+      width:min(420px,100%);
+    }
+    #plus-menu.open{display:flex;}
+    #composer-actions-row{
+      width:min(520px,100%);
+      display:flex;
+      justify-content:flex-end;
+      align-items:center;
+      margin-top:2px;
+    }
+    .composer-spacer{flex:1;}
+    .end-session-fixed{
+      width:auto;
+      min-width:140px;
+    }
+    .action-btn{
+      width:100%;background:none;border:1px solid var(--border);color:var(--text);padding:10px 14px;
+      border-radius:3px;text-transform:uppercase;letter-spacing:1px;cursor:pointer;font-size:11px;
+      transition:.15s;background:var(--panel);
+    }
+    .action-btn:hover{border-color:var(--accent);color:var(--accent);}
+    .action-btn.danger:hover{border-color:var(--accent2);color:var(--accent2);}
+
+    #session-form-wrap{
+      display:none;
+      width:min(520px,100%);
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:6px;
+      padding:16px;
+      position:relative;
+      z-index:30;
+    }
+    #session-form-wrap.open{display:block;box-shadow:0 0 0 1px rgba(232,255,71,.15);}
+
+    #form-topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:14px;
+    }
+    #close-form-btn{
+      background:none;
+      border:none;
+      color:var(--muted);
+      font-size:22px;
+      line-height:1;
+      cursor:pointer;
+      padding:0 4px;
+    }
+    #close-form-btn:hover{color:var(--accent);}
+    #session-form-wrap h3{
+      font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--accent);margin-bottom:14px;
+    }
+    .form-row{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;}
+    .form-row label,.mini-label{
+      font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);
+    }
+    .field, .num-input, .date-input{
+      background:var(--entry-bg);border:1px solid var(--border);color:var(--text);outline:none;border-radius:3px;
+    }
+    .field,.date-input{
+      width:100%;padding:10px 12px;
+    }
+    .field:focus,.num-input:focus,.date-input:focus{border-color:var(--accent);}
+    .inline-grid{display:flex;gap:14px;align-items:end;flex-wrap:wrap;margin-bottom:14px;}
+    .sets-box{width:95px;}
+    .num-input{
+      width:100%;
+      padding:10px 10px;
+      text-align:center;
+      appearance:textfield;
+      -moz-appearance:textfield;
+    }
+    .num-input::-webkit-outer-spin-button,.num-input::-webkit-inner-spin-button{appearance:none;margin:0;}
+    #sets-detail{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
+    .set-row{
+      border:1px solid var(--border);
+      background:var(--entry-bg);
+      border-radius:4px;
+      padding:10px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .set-top{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+    .set-label{font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;}
+    .toggle-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+    .toggle-chip{
+      border:1px solid var(--border);
+      background:var(--panel);
+      color:var(--muted);
+      padding:6px 10px;
+      border-radius:999px;
+      cursor:pointer;
+      font-size:10px;
+      letter-spacing:1px;
+      text-transform:uppercase;
+    }
+    .toggle-chip.active{color:var(--accent);border-color:var(--accent);}
+    .set-inputs,.arm-inputs{display:flex;gap:10px;flex-wrap:wrap;}
+    .input-block{flex:1;min-width:100px;}
+    .arm-inputs{display:none;}
+    .arm-inputs.active{display:flex;}
+    .drop-set-wrap{
+      display:none;
+      border-top:1px solid var(--border);
+      padding-top:8px;
+      margin-top:2px;
+    }
+    .drop-set-wrap.active{display:block;}
+    .drop-set-grid{
+      display:grid;
+      grid-template-columns:1.1fr .9fr .9fr;
+      gap:8px;
+    }
+    .drop-set-grid .input-block{min-width:0;}
+    .drop-title{
+      font-size:8px;
+      color:var(--muted);
+      letter-spacing:2px;
+      text-transform:uppercase;
+      margin-bottom:6px;
+    }
+    .drop-set-wrap .num-input{
+      padding:8px 9px;
+      font-size:14px;
+    }
+    .drop-set-wrap .mini-label{
+      font-size:8px;
+      letter-spacing:1px;
+    }
+    .helper{font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:4px;}
+    .prev-line{
+      font-size:9px;
+      color:#7a7a7a;
+      letter-spacing:1px;
+      text-transform:uppercase;
+      margin-top:5px;
+      min-height:12px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .prev-target{display:inline;}
+    .set-progress-indicator,.drop-progress-indicator{
+      color:var(--green);
+    }
+    .notice{
+      border:1px solid rgba(125,255,138,.25);
+      background:rgba(125,255,138,.06);
+      color:var(--green);
+      padding:8px 10px;
+      border-radius:4px;
+      font-size:10px;
+      text-transform:uppercase;
+      letter-spacing:1px;
+      display:none;
+      margin-bottom:12px;
+    }
+    .notice.show{display:block;}
+
+    #save-feedback{
+      display:none;
+      color:var(--green);
+      font-size:10px;
+      letter-spacing:1px;
+      text-transform:uppercase;
+      margin-top:8px;
+    }
+    #save-feedback.show{
+      display:block;
+    }
+
+    #form-actions{
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      margin-top:8px;
+    }
+    #log-exercise-btn{
+      background:var(--accent);
+      color:#000;
+      border:none;
+      padding:10px 18px;
+      border-radius:3px;
+      text-transform:uppercase;
+      letter-spacing:1px;
+      cursor:pointer;
+      font-size:11px;
+    }
+    #log-exercise-btn:hover{
+      background:#fff;
+    }
+
+    .hidden{display:none!important;}
+
+    @media (max-width: 700px){
+      #top-bar{padding:12px 14px;}
+      #main-title{font-size:30px;}
+      #log-area{padding:14px;}
+      #composer-wrap{padding:12px 14px 14px;}
+      #session-form-wrap{padding:14px;}
+      .drop-set-grid{
+        grid-template-columns:1fr 1fr 1fr;
+        gap:6px;
+      }
+      .drop-set-wrap .num-input{
+        padding:7px 8px;
+        font-size:13px;
+      }
+    }
+  </style>
+
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Iron Log">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+
+</head>
+<body>
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <h1>IRON<br>LOG</h1>
+      <p>GYM PROGRESSION</p>
+    </div>
+    <div id="muscle-list"></div>
+    <button id="add-muscle-btn">+ Add Group</button>
+  </div>
+
+  <div id="main">
+    <div id="top-bar">
+      <div id="top-left">
+        <div id="no-group-hint">Select a group</div>
+        <div id="group-info">
+          <div id="main-title"></div>
+          <div id="main-subtitle"></div>
+        </div>
+      </div>
+      <div id="top-actions">
+        <div id="session-progress">In Session</div>
+        <button id="menu-toggle" title="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+
+    <div id="content-wrap">
+      <div id="no-selection">
+        <div class="giant">LIFT</div>
+        <p>Open the menu and pick a muscle group</p>
+      </div>
+
+      <div id="log-area"></div>
+
+      <div id="composer-wrap" class="hidden">
+        <div id="action-stack">
+          <div id="plus-wrap">
+            <button id="plus-btn" title="Session actions">+</button>
+            <div id="plus-menu">
+              <button class="action-btn" id="add-exercise-btn">Add Exercise</button>
+              <button class="action-btn" id="duplicate-last-exercise-btn">Duplicate Last Exercise</button>
+              <button class="action-btn" id="duplicate-last-session-btn">Duplicate Last Session</button>
+            </div>
+          </div>
+
+          <div id="composer-actions-row">
+            <div class="composer-spacer"></div>
+            <button class="action-btn danger end-session-fixed" id="end-session-btn">End Session</button>
+          </div>
+
+          <div id="session-form-wrap">
+            <div id="form-topbar">
+              <h3>LOG EXERCISE</h3>
+              <button type="button" id="close-form-btn">×</button>
+            </div>
+            <div id="progress-notice" class="notice"></div>
+
+            <div class="form-row">
+              <label class="mini-label">Date</label>
+              <input type="date" id="input-date" class="date-input">
+            </div>
+
+            <div class="form-row">
+              <input type="text" id="exercise-name-input" class="field" placeholder="" list="exercise-name-list">
+              <datalist id="exercise-name-list"></datalist>
+            </div>
+
+            <div class="inline-grid">
+              <div class="sets-box">
+                <label class="mini-label">Sets</label>
+                <input type="number" id="sets-input" class="num-input" min="1" max="20" placeholder="">
+              </div>
+            </div>
+
+            <div id="sets-detail"></div>
+
+            <div id="form-actions">
+              <button type="button" id="log-exercise-btn">Log Exercise</button>
+            </div>
+            <div id="save-feedback">Exercise saved</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const DEFAULT_GROUPS = [
+  {id:'chest',name:'Chest'},
+  {id:'back',name:'Back'},
+  {id:'shoulders',name:'Shoulders'},
+  {id:'arms',name:'Arms'},
+  {id:'legs',name:'Legs'},
+  {id:'core',name:'Core'}
+];
+
+function loadState(){
+  try{
+    return {
+      groups: JSON.parse(localStorage.getItem('ironlog_groups') || 'null') || DEFAULT_GROUPS,
+      logs: JSON.parse(localStorage.getItem('ironlog_logs') || '{}'),
+      drafts: JSON.parse(localStorage.getItem('ironlog_drafts') || '{}')
+    };
+  } catch(e){
+    return {groups: DEFAULT_GROUPS, logs: {}, drafts: {}};
+  }
+}
+const state = loadState();
+
+function saveState(){
+  localStorage.setItem('ironlog_groups', JSON.stringify(state.groups));
+  localStorage.setItem('ironlog_logs', JSON.stringify(state.logs));
+  localStorage.setItem('ironlog_drafts', JSON.stringify(state.drafts));
+}
+
+let activeId = null;
+let sidebarOpen = true;
+let plusOpen = false;
+let sessionDraft = null;
+let editingEntryId = null;
+let joinedDraftGroupId = null;
+
+const els = {
+  sidebar: document.getElementById('sidebar'),
+  muscleList: document.getElementById('muscle-list'),
+  noSelection: document.getElementById('no-selection'),
+  logArea: document.getElementById('log-area'),
+  composerWrap: document.getElementById('composer-wrap'),
+  mainTitle: document.getElementById('main-title'),
+  mainSubtitle: document.getElementById('main-subtitle'),
+  noGroupHint: document.getElementById('no-group-hint'),
+  groupInfo: document.getElementById('group-info'),
+  menuToggle: document.getElementById('menu-toggle'),
+  plusBtn: document.getElementById('plus-btn'),
+  plusMenu: document.getElementById('plus-menu'),
+  addExerciseBtn: document.getElementById('add-exercise-btn'),
+  dupLastExerciseBtn: document.getElementById('duplicate-last-exercise-btn'),
+  dupLastSessionBtn: document.getElementById('duplicate-last-session-btn'),
+  endSessionBtn: document.getElementById('end-session-btn'),
+  formWrap: document.getElementById('session-form-wrap'),
+  inputDate: document.getElementById('input-date'),
+  exerciseName: document.getElementById('exercise-name-input'),
+  setsInput: document.getElementById('sets-input'),
+  setsDetail: document.getElementById('sets-detail'),
+  sessionProgress: document.getElementById('session-progress'),
+  progressNotice: document.getElementById('progress-notice'),
+  logExerciseBtn: document.getElementById('log-exercise-btn'),
+  saveFeedback: document.getElementById('save-feedback'),
+  closeFormBtn: document.getElementById('close-form-btn'),
+  exerciseNameList: document.getElementById('exercise-name-list')
+};
+
+function todayStr(){ return new Date().toISOString().split('T')[0]; }
+
+function getLogs(){ return state.logs[activeId] || []; }
+
+
+function getDraft(groupId=activeId){
+  return groupId ? (state.drafts[groupId] || null) : null;
+}
+function ensureDraft(groupId=activeId, date=todayStr()){
+  if (!state.drafts[groupId]) state.drafts[groupId] = {date, entryIds: []};
+  if (!state.drafts[groupId].date) state.drafts[groupId].date = date;
+  if (!Array.isArray(state.drafts[groupId].entryIds)) state.drafts[groupId].entryIds = [];
+  return state.drafts[groupId];
+}
+function clearDraft(groupId=activeId){
+  if (groupId && state.drafts[groupId]) delete state.drafts[groupId];
+}
+function getEntryById(id){
+  return getLogs().find(e => e.id === id) || null;
+}
+function getDraftEntries(groupId=activeId){
+  const draft = getDraft(groupId);
+  if (!draft || !Array.isArray(draft.entryIds)) return [];
+  return draft.entryIds.map(id => getEntryById(id)).filter(Boolean).sort((a,b)=> (a.order||0) - (b.order||0));
+}
+function getAllExerciseNames(){
+  const names = new Set();
+  Object.values(state.logs || {}).forEach(entries => {
+    (entries || []).forEach(entry => {
+      const name = String(entry.exercise || '').trim();
+      if (name) names.add(name);
+    });
+  });
+  return [...names].sort((a,b)=>a.localeCompare(b));
+}
+function getAllDropSetNames(){
+  const names = new Set();
+  Object.values(state.logs || {}).forEach(entries => {
+    (entries || []).forEach(entry => {
+      (entry.sets || []).forEach(set => {
+        const name = String(set.dropName || '').trim();
+        if (name) names.add(name);
+      });
+    });
+  });
+  return [...names].sort((a,b)=>a.localeCompare(b));
+}
+function renderExerciseNameOptions(){
+  if (!els.exerciseNameList) return;
+  els.exerciseNameList.innerHTML = getAllExerciseNames().map(name => `<option value="${escapeHtml(name)}"></option>`).join('');
+}
+function createDropSetDatalistMarkup(index){
+  const options = getAllDropSetNames().map(name => `<option value="${escapeHtml(name)}"></option>`).join('');
+  return `<datalist id="drop-name-list-${index}">${options}</datalist>`;
+}
+
+function toggleSidebar(force){
+  sidebarOpen = force !== undefined ? force : !sidebarOpen;
+  els.sidebar.classList.toggle('collapsed', !sidebarOpen);
+}
+
+els.menuToggle.addEventListener('click', ()=>toggleSidebar());
+
+function renderSidebar(){
+  els.muscleList.innerHTML = '';
+  state.groups.forEach(group=>{
+    const item = document.createElement('div');
+    item.className = 'muscle-item' + (group.id === activeId ? ' active' : '');
+    item.dataset.id = group.id;
+    item.innerHTML = `
+      <span class="muscle-name">${escapeHtml(group.name)}</span>
+      <div class="side-actions">
+        <button class="icon-btn rename" title="Rename">✎</button>
+        <button class="icon-btn delete" title="Delete">✕</button>
+      </div>
+    `;
+    item.addEventListener('click', (e)=>{
+      if (e.target.closest('.side-actions')) return;
+      setActive(group.id);
+      if (window.innerWidth < 900) toggleSidebar(false);
+    });
+    item.querySelector('.rename').addEventListener('click', (e)=>{
+      e.stopPropagation();
+      startRenameGroup(group.id, item);
+    });
+    item.querySelector('.delete').addEventListener('click', (e)=>{
+      e.stopPropagation();
+      deleteGroup(group.id);
+    });
+    els.muscleList.appendChild(item);
+  });
+}
+
+function deleteGroup(id){
+  const group = state.groups.find(g=>g.id===id);
+  if (!group) return;
+  if (!confirm(`Delete "${group.name}" and all its logs?`)) return;
+  state.groups = state.groups.filter(g=>g.id!==id);
+  delete state.logs[id];
+  if (activeId === id){
+    activeId = null;
+    sessionDraft = null;
+  }
+  saveState();
+  renderSidebar();
+  renderMain();
+}
+
+function startRenameGroup(id, item){
+  const group = state.groups.find(g=>g.id===id);
+  const nameEl = item.querySelector('.muscle-name');
+  const input = document.createElement('input');
+  input.className = 'muscle-name-input';
+  input.value = group.name;
+  nameEl.replaceWith(input);
+  input.focus();
+  input.select();
+
+  function finish(){
+    const value = input.value.trim();
+    if (value){
+      group.name = value;
+      saveState();
+    }
+    renderSidebar();
+    renderMain();
+  }
+
+  input.addEventListener('blur', finish);
+  input.addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter') input.blur();
+    if (e.key === 'Escape'){
+      input.value = group.name;
+      input.blur();
+    }
+  });
+}
+
+document.getElementById('add-muscle-btn').addEventListener('click', ()=>{
+  const id = 'group_' + Date.now();
+  state.groups.push({id, name:'New Group'});
+  saveState();
+  renderSidebar();
+  setTimeout(()=>{
+    const item = document.querySelector(`.muscle-item[data-id="${id}"]`);
+    if (item) startRenameGroup(id, item);
+  }, 30);
+});
+
+function setActive(id){
+  if (activeId && activeId !== id && joinedDraftGroupId === activeId) joinedDraftGroupId = null;
+  activeId = id;
+  closePlusMenu();
+  renderSidebar();
+  renderMain();
+}
+
+function renderMain(){
+  const group = state.groups.find(g=>g.id===activeId);
+  if (!group){
+    els.noSelection.style.display = 'flex';
+    els.logArea.style.display = 'none';
+    els.composerWrap.classList.add('hidden');
+    els.noGroupHint.style.display = 'block';
+    els.groupInfo.style.display = 'none';
+    els.sessionProgress.style.display = 'none';
+    return;
+  }
+
+  els.noSelection.style.display = 'none';
+  els.logArea.style.display = 'block';
+  els.composerWrap.classList.remove('hidden');
+  els.noGroupHint.style.display = 'none';
+  els.groupInfo.style.display = 'block';
+
+  const logs = getLogs();
+  const draft = getDraft();
+  els.mainTitle.textContent = group.name.toUpperCase();
+  els.mainSubtitle.textContent = '';
+  const inSession = !!draft;
+  els.sessionProgress.style.display = inSession ? 'block' : 'none';
+  els.endSessionBtn.style.display = inSession ? 'block' : 'none';
+
+  renderExerciseNameOptions();
+  renderLog();
+  updatePlusMenuVisibility();
+}
+
+function formatLoggedWeight(value){
+  const text = String(value ?? '').trim();
+  if (!text || text === '—') return '—';
+  return `${text} lbs`;
+}
+
+function groupLogsByDate(logs){
+  const byDate = {};
+  logs.forEach(entry=>{
+    const d = entry.date || 'No date';
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(entry);
+  });
+  return byDate;
+}
+
+
+function renderLog(){
+  const logs = getLogs().slice().sort((a,b)=> {
+    const ad = (a.date || '') + (a.createdAt || a.id || '');
+    const bd = (b.date || '') + (b.createdAt || b.id || '');
+    return bd.localeCompare(ad);
+  });
+
+  if (!logs.length){
+    els.logArea.innerHTML = `<div class="empty-state"><p>No sessions yet</p></div>`;
+    return;
+  }
+
+  const byDate = groupLogsByDate(logs);
+  const dates = Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+  const draft = getDraft();
+  const activeSessionDate = draft && draft.date ? draft.date : null;
+  const joined = joinedDraftGroupId === activeId;
+
+  let html = '';
+  dates.forEach(date=>{
+    const label = date !== 'No date'
+      ? new Date(date + 'T00:00:00').toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'long', year:'numeric'})
+      : 'No date';
+
+    let exercises = byDate[date].slice().sort((a,b)=> (a.order||0) - (b.order||0));
+    const isDraftDate = !!draft && date === activeSessionDate;
+    const isJoinedDraft = isDraftDate && joined;
+    if (isDraftDate && draft.entryIds?.length){
+      const draftSet = new Set(draft.entryIds);
+      exercises = exercises.filter(e => draftSet.has(e.id)).sort((a,b)=> (a.order||0) - (b.order||0));
+    }
+
+    const exerciseCount = exercises.length;
+    const totalSets = exercises.reduce((sum, entry)=> sum + ((entry.sets || []).filter(set => !set.dropSet).length), 0);
+
+    if (isJoinedDraft){
+      html += `<div class="session-block"><div class="session-date">${label}</div>`;
+    } else {
+      const sessionLabel = isDraftDate ? 'Session in progress' : `${exerciseCount} exercise${exerciseCount===1?'':'s'} • ${totalSets} set${totalSets===1?'':'s'}`;
+      html += `
+        <div class="session-block">
+          <details class="session-details">
+            <summary class="session-summary">
+              <div class="session-summary-left">
+                <div class="session-date">${label}</div>
+                <div class="session-meta">${sessionLabel}</div>
+              </div>
+              <div class="session-chevron">›</div>
+            </summary>
+            <div class="session-content">
+      `;
+      if (isDraftDate){
+        html += `<button class="action-btn rejoin-session-btn" data-date="${date}">Rejoin Session</button>`;
+      }
+    }
+
+    exercises.forEach(entry=>{
+      let summaryText = entry.progressSummary || '';
+      if (summaryText === 'Reps up' || summaryText === 'Weight up' || summaryText === 'Weight up • Reps up') {
+        summaryText = 'Nice progression!';
+      }
+
+      html += `
+        <div class="exercise-card" data-entry-id="${entry.id}">
+          <div class="exercise-header">
+            <span class="exercise-name">${escapeHtml(entry.exercise || '')}</span>
+            <div class="exercise-actions">
+              <button class="edit-entry-btn" data-id="${entry.id}" title="Edit">✎</button>
+              <button class="delete-entry-btn" data-id="${entry.id}" title="Delete">✕</button>
+            </div>
+          </div>
+          <table class="sets-table">
+            <tr><th>Set</th><th>Reps</th><th>Weight</th></tr>
+      `;
+
+      (entry.sets || []).forEach((set, i)=>{
+        const extraDrop = set.dropSet && (set.dropName || set.dropReps || set.dropWeight)
+          ? `<div class="helper">Drop: ${escapeHtml(set.dropName || '—')} Reps: ${escapeHtml(set.dropReps || '—')} Weight: ${escapeHtml(set.dropWeight || '—')}</div>`
+          : '';
+
+        if (set.singleArm){
+          html += `
+            <tr>
+              <td>${i+1}</td>
+              <td>
+                <div class="arm-grid">
+                  <div class="arm-box"><span class="arm-tag">L</span><span>${set.leftReps ?? '—'}</span></div>
+                  <div class="arm-box"><span class="arm-tag">R</span><span>${set.rightReps ?? '—'}</span></div>
+                </div>
+                ${extraDrop}
+              </td>
+              <td>
+                <div class="arm-grid">
+                  <div class="arm-box"><span class="arm-tag">L</span><span>${formatLoggedWeight(set.leftWeight)}</span></div>
+                  <div class="arm-box"><span class="arm-tag">R</span><span>${formatLoggedWeight(set.rightWeight)}</span></div>
+                </div>
+              </td>
+            </tr>
+          `;
+        } else {
+          html += `<tr><td>${i+1}</td><td>${set.reps ?? '—'}${extraDrop}</td><td>${formatLoggedWeight(set.weight)}</td></tr>`;
+        }
+      });
+
+      if (summaryText){
+        html += `<tr><td colspan="3"><div class="progress-badge">${escapeHtml(summaryText)}</div></td></tr>`;
+      }
+
+      html += `</table></div>`;
+    });
+
+    if (isJoinedDraft){
+      html += `</div>`;
+    } else {
+      html += `</div></details></div>`;
+    }
+  });
+
+  els.logArea.innerHTML = html;
+
+  els.logArea.querySelectorAll('.rejoin-session-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      joinedDraftGroupId = activeId;
+      closePlusMenu();
+      renderMain();
+    });
+  });
+
+  els.logArea.querySelectorAll('.delete-entry-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      const entry = getLogs().find(e => e.id === id);
+      const label = entry && entry.exercise ? entry.exercise : 'this exercise';
+      const ok = confirm(`Delete "${label}"?`);
+      if (!ok) return;
+
+      state.logs[activeId] = getLogs().filter(e=>e.id !== id);
+      const draft = getDraft();
+      if (draft?.entryIds) draft.entryIds = draft.entryIds.filter(x => x !== id);
+      saveState();
+      renderMain();
+    });
+  });
+
+  els.logArea.querySelectorAll('.edit-entry-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      beginEditEntry(id);
+    });
+  });
+}
+
+function beginEditEntry(id){
+  const entry = getLogs().find(e=>e.id === id);
+  if (!entry) return;
+
+  editingEntryId = id;
+  joinedDraftGroupId = activeId;
+  sessionDraft = {
+    date: entry.date || todayStr(),
+    exercise: entry.exercise || '',
+    order: entry.order || 0,
+    sets: (entry.sets || []).map(s=> JSON.parse(JSON.stringify(s)))
+  };
+
+  plusOpen = false;
+  els.plusBtn.classList.remove('open');
+  els.plusMenu.classList.remove('open');
+
+  openForm();
+  populateFormFromDraft();
+  els.saveFeedback.classList.remove('show');
+  updatePreviousTargets();
+  updateProgressNotice();
+  updatePlusMenuVisibility();
+
+  requestAnimationFrame(() => {
+    try {
+      els.formWrap.scrollIntoView({behavior:'smooth', block:'nearest'});
+    } catch(e) {}
+    try {
+      els.exerciseName.focus({preventScroll:true});
+    } catch(e) {
+      els.exerciseName.focus();
+    }
+  });
+}
+
+function openPlusMenu(){
+  plusOpen = true;
+  els.plusBtn.classList.add('open');
+  els.plusMenu.classList.add('open');
+  updatePlusMenuVisibility();
+}
+function closePlusMenu(){
+  plusOpen = false;
+  els.plusBtn.classList.remove('open');
+  els.plusMenu.classList.remove('open');
+  hideForm();
+}
+els.plusBtn.addEventListener('click', (e)=>{
+  e.stopPropagation();
+  plusOpen ? closePlusMenu() : openPlusMenu();
+});
+
+els.plusMenu.addEventListener('click', (e)=>{
+  e.stopPropagation();
+});
+
+function openForm(){
+  els.formWrap.classList.add('open');
+}
+function hideForm(force=false){
+  if (force || (!editingEntryId && !sessionDraft)) {
+    els.formWrap.classList.remove('open');
+    if (force) {
+      els.progressNotice.textContent = '';
+      els.progressNotice.classList.remove('show');
+    }
+  }
+}
+
+function clearFormOnly(){
+  els.exerciseName.value = '';
+  els.setsInput.value = '';
+  els.setsDetail.innerHTML = '';
+  els.progressNotice.classList.remove('show');
+  els.progressNotice.textContent = '';
+}
+
+function createBlankSet(singleArm=false){
+  return singleArm
+    ? {singleArm:true,leftReps:'',rightReps:'',leftWeight:'',rightWeight:''}
+    : {singleArm:false,reps:'',weight:''};
+}
+
+function startSessionIfNeeded(){
+  ensureDraft(activeId, els.inputDate.value || todayStr());
+  joinedDraftGroupId = activeId;
+  els.sessionProgress.style.display = 'block';
+}
+
+function getDraftExercises(){
+  if (!sessionDraft) return [];
+  if (sessionDraft.exercises) return sessionDraft.exercises;
+  return [sessionDraft];
+}
+
+function currentDraftDate(){
+  return getDraft()?.date || '';
+}
+
+function isNewTrainingDay(){
+  const logs = getLogs();
+  if (!logs.length) return true;
+  const latestDate = logs.slice().sort((a,b)=>((b.date||'') + (b.id||'')).localeCompare((a.date||'') + (a.id||'')))[0].date || '';
+  return latestDate !== todayStr();
+}
+
+function updatePlusMenuVisibility(){
+  const hasLogs = getLogs().length > 0;
+  const previousSessionDate = getPreviousSessionDateBefore(todayStr());
+  const showFullDuplicate = !getDraft() && !!previousSessionDate;
+  els.dupLastSessionBtn.style.display = showFullDuplicate ? 'block' : 'none';
+  els.dupLastExerciseBtn.style.display = hasLogs ? 'block' : 'block';
+}
+
+function populateFormFromDraft(){
+  const draft = sessionDraft && !sessionDraft.exercises ? sessionDraft : null;
+  if (!draft) return;
+  els.inputDate.value = draft.date || todayStr();
+  els.exerciseName.value = draft.exercise || '';
+  els.setsInput.value = draft.sets ? draft.sets.length : '';
+  buildSetsDetail(draft.sets || []);
+}
+
+
+function buildSetsDetail(existingSets=null){
+  let count = parseInt(els.setsInput.value, 10);
+  if (!count || count < 1){
+    els.setsDetail.innerHTML = '';
+    return;
+  }
+  count = Math.min(Math.max(count,1),20);
+
+  const prev = existingSets || Array.from(els.setsDetail.querySelectorAll('.set-row')).map(readSetRow);
+  els.setsDetail.innerHTML = '';
+
+  for (let i=0; i<count; i++){
+    const setData = prev[i] || createBlankSet(false);
+    const row = document.createElement('div');
+    row.className = 'set-row';
+    row.innerHTML = `
+      <div class="set-top">
+        <div class="set-label">Set ${i+1}</div>
+        <div class="toggle-line">
+          <span class="mini-label">Single Arm</span>
+          <button type="button" class="toggle-chip single-arm-toggle ${setData.singleArm ? 'active' : ''}">${setData.singleArm ? 'On' : 'Off'}</button>
+          <span class="mini-label">Drop Set</span>
+          <button type="button" class="toggle-chip drop-set-toggle ${setData.dropSet ? 'active' : ''}">${setData.dropSet ? 'On' : 'Off'}</button>
+        </div>
+      </div>
+
+      <div class="set-inputs ${setData.singleArm ? 'hidden' : ''}">
+        <div class="input-block">
+          <label class="mini-label">Reps</label>
+          <input type="text" class="num-input reps-input" value="${setData.reps ?? ''}" placeholder="" inputmode="text" autocapitalize="off" autocomplete="off" spellcheck="false">
+          <div class="prev-line"><span class="prev-target prev-reps-target"></span><span class="set-progress-indicator prev-reps-progress"></span></div>
+        </div>
+        <div class="input-block">
+          <label class="mini-label">Weight (lbs)</label>
+          <input type="text" class="num-input weight-input" value="${setData.weight ?? ''}" placeholder="" inputmode="text" autocapitalize="off" autocomplete="off" spellcheck="false">
+          <div class="prev-line"><span class="prev-target prev-weight-target"></span></div>
+        </div>
+      </div>
+
+      <div class="arm-inputs ${setData.singleArm ? 'active' : ''}">
+        <div class="input-block">
+          <label class="mini-label">Left Reps</label>
+          <input type="text" class="num-input left-reps-input" value="${setData.leftReps ?? ''}" placeholder="" inputmode="text" autocapitalize="off" autocomplete="off" spellcheck="false">
+          <div class="prev-line"><span class="prev-target prev-left-reps-target"></span><span class="set-progress-indicator prev-left-progress"></span></div>
+        </div>
+        <div class="input-block">
+          <label class="mini-label">Left Weight (lbs)</label>
+          <input type="text" class="num-input left-weight-input" value="${setData.leftWeight ?? ''}" placeholder="" inputmode="text" autocapitalize="off" autocomplete="off" spellcheck="false">
+          <div class="prev-line"><span class="prev-target prev-left-weight-target"></span></div>
+        </div>
+        <div class="input-block">
+          <label class="mini-label">Right Reps</label>
+          <input type="text" class="num-input right-reps-input" value="${setData.rightReps ?? ''}" placeholder="" inputmode="text" autocapitalize="off" autocomplete="off" spellcheck="false">
+          <div class="prev-line"><span class="prev-target prev-right-reps-target"></span><span class="set-progress-indicator prev-right-progress"></span></div>
+        </div>
+        <div class="input-block">
+          <label class="mini-label">Right Weight (lbs)</label>
+          <input type="text" class="num-input right-weight-input" value="${setData.rightWeight ?? ''}" placeholder="" inputmode="text" autocapitalize="off" autocomplete="off" spellcheck="false">
+          <div class="prev-line"><span class="prev-target prev-right-weight-target"></span></div>
+        </div>
+      </div>
+
+      <div class="drop-set-wrap ${setData.dropSet ? 'active' : ''}">
+        <div class="drop-title">Drop Set</div>
+        <div class="drop-set-grid">
+          <div class="input-block">
+            <label class="mini-label">Name</label>
+            <input type="text" class="num-input drop-name-input" value="${setData.dropName ?? ''}" placeholder="" list="drop-name-list-${i}" inputmode="text" autocapitalize="off" autocomplete="off" spellcheck="false">
+            ${createDropSetDatalistMarkup(i)}
+          </div>
+          <div class="input-block">
+            <label class="mini-label">Reps</label>
+            <input type="text" class="num-input drop-reps-input" value="${setData.dropReps ?? ''}" placeholder="" inputmode="text" autocapitalize="off" autocomplete="off" spellcheck="false">
+            <div class="prev-line"><span class="prev-target drop-prev-reps-target"></span><span class="drop-progress-indicator drop-prev-progress"></span></div>
+          </div>
+          <div class="input-block">
+            <label class="mini-label">Weight</label>
+            <input type="text" class="num-input drop-weight-input" value="${setData.dropWeight ?? ''}" placeholder="" inputmode="text" autocapitalize="off" autocomplete="off" spellcheck="false">
+            <div class="prev-line"><span class="prev-target drop-prev-weight-target"></span></div>
+          </div>
+        </div>
+      </div>
+    `;
+    const singleArmToggle = row.querySelector('.single-arm-toggle');
+    const dropSetToggle = row.querySelector('.drop-set-toggle');
+
+    singleArmToggle.addEventListener('click', ()=>{
+      const active = singleArmToggle.classList.toggle('active');
+      singleArmToggle.textContent = active ? 'On' : 'Off';
+      row.querySelector('.set-inputs').classList.toggle('hidden', active);
+      row.querySelector('.arm-inputs').classList.toggle('active', active);
+      updatePreviousTargets();
+      updateProgressNotice();
+    });
+
+    dropSetToggle.addEventListener('click', ()=>{
+      const active = dropSetToggle.classList.toggle('active');
+      dropSetToggle.textContent = active ? 'On' : 'Off';
+      row.querySelector('.drop-set-wrap').classList.toggle('active', active);
+      updatePreviousTargets();
+      updateProgressNotice();
+    });
+
+    row.querySelectorAll('input').forEach(input=>{
+      if (input.type === 'number') attachWheelInput(input);
+      input.addEventListener('input', ()=>{
+        updatePreviousTargets();
+        updateProgressNotice();
+      });
+      input.addEventListener('focus', ()=> input.select());
+    });
+
+    els.setsDetail.appendChild(row);
+  }
+  updatePreviousTargets();
+  updateProgressNotice();
+}
+
+
+function attachWheelInput(input){
+  input.addEventListener('wheel', (e)=>{
+    const isTextLike = input.type === 'text';
+    if (isTextLike) return;
+    e.preventDefault();
+    const step = parseFloat(input.step || '1') || 1;
+    const min = input.min !== '' ? parseFloat(input.min) : -Infinity;
+    let value = input.value === '' ? 0 : parseFloat(input.value);
+    if (isNaN(value)) value = 0;
+    value += e.deltaY > 0 ? -step : step;
+    if (value < min) value = min;
+    input.value = (Math.round(value * 100) / 100).toString().replace(/\.0+$/,'');
+    input.dispatchEvent(new Event('input', {bubbles:true}));
+  }, {passive:false});
+}
+
+
+function readSetRow(row){
+  const singleArm = row.querySelector('.single-arm-toggle').classList.contains('active');
+  const dropSet = row.querySelector('.drop-set-toggle').classList.contains('active');
+
+  const base = {
+    dropSet,
+    dropName: row.querySelector('.drop-name-input') ? row.querySelector('.drop-name-input').value : '',
+    dropReps: row.querySelector('.drop-reps-input') ? row.querySelector('.drop-reps-input').value : '',
+    dropWeight: row.querySelector('.drop-weight-input') ? row.querySelector('.drop-weight-input').value : ''
+  };
+
+  if (singleArm){
+    return {
+      singleArm: true,
+      leftReps: row.querySelector('.left-reps-input').value,
+      leftWeight: row.querySelector('.left-weight-input').value,
+      rightReps: row.querySelector('.right-reps-input').value,
+      rightWeight: row.querySelector('.right-weight-input').value,
+      ...base
+    };
+  }
+  return {
+    singleArm: false,
+    reps: row.querySelector('.reps-input').value,
+    weight: row.querySelector('.weight-input').value,
+    ...base
+  };
+}
+
+els.setsInput.addEventListener('input', ()=> buildSetsDetail());
+
+function normalizeSetValues(set){
+  if (set.singleArm){
+    return {
+      singleArm: true,
+      leftReps: String(set.leftReps ?? '').trim(),
+      rightReps: String(set.rightReps ?? '').trim(),
+      leftWeight: String(set.leftWeight ?? '').trim(),
+      rightWeight: String(set.rightWeight ?? '').trim(),
+      dropSet: !!set.dropSet,
+      dropName: String(set.dropName ?? '').trim(),
+      dropReps: String(set.dropReps ?? '').trim(),
+      dropWeight: String(set.dropWeight ?? '').trim()
+    };
+  }
+  return {
+    singleArm: false,
+    reps: String(set.reps ?? '').trim(),
+    weight: String(set.weight ?? '').trim(),
+    dropSet: !!set.dropSet,
+    dropName: String(set.dropName ?? '').trim(),
+    dropReps: String(set.dropReps ?? '').trim(),
+    dropWeight: String(set.dropWeight ?? '').trim()
+  };
+}
+
+function buildExerciseFromForm(){
+  const date = els.inputDate.value || todayStr();
+  const exercise = els.exerciseName.value.trim();
+  if (!exercise) {
+    els.exerciseName.focus();
+    return null;
+  }
+  const setsCount = parseInt(els.setsInput.value, 10);
+  if (!setsCount) {
+    els.setsInput.focus();
+    return null;
+  }
+  const sets = Array.from(els.setsDetail.querySelectorAll('.set-row')).map(readSetRow).map(normalizeSetValues);
+  return {
+    id: editingEntryId || 'entry_' + Date.now(),
+    date,
+    exercise,
+    sets
+  };
+}
+
+function buildExercisePreviewFromForm(){
+  const date = els.inputDate.value || todayStr();
+  const exercise = els.exerciseName.value.trim();
+  const setsCount = parseInt(els.setsInput.value, 10);
+
+  if (!exercise || !setsCount || !els.setsDetail.querySelector('.set-row')) {
+    return null;
+  }
+
+  const sets = Array.from(els.setsDetail.querySelectorAll('.set-row'))
+    .map(readSetRow)
+    .map(normalizeSetValues);
+
+  return {
+    id: editingEntryId || 'preview',
+    date,
+    exercise,
+    sets
+  };
+}
+
+function getLatestExercise(){
+  const logs = getLogs();
+  if (!logs.length) return null;
+  return logs.slice().sort((a,b)=> ((b.date||'') + (b.order||0) + (b.id||'')).localeCompare((a.date||'') + (a.order||0) + (a.id||'')))[0];
+}
+
+function getLatestSessionDate(){
+  const logs = getLogs();
+  if (!logs.length) return null;
+  return logs.slice().sort((a,b)=>((b.date||'') + (b.id||'')).localeCompare((a.date||'') + (a.id||'')))[0].date || null;
+}
+
+function getPreviousSessionDateBefore(dateStr){
+  const dates = [...new Set(getLogs().map(e => e.date).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
+  return dates.find(d => d < dateStr) || null;
+}
+
+function getReferenceExerciseForCurrentForm(){
+  const exerciseName = els.exerciseName.value.trim().toLowerCase();
+  const currentDate = els.inputDate.value || todayStr();
+  if (!exerciseName) return null;
+
+  const prevSessionDate = getPreviousSessionDateBefore(currentDate);
+  if (!prevSessionDate) return null;
+
+  const prevSession = getSessionByDate(prevSessionDate);
+  return prevSession.find(e => (e.exercise || '').trim().toLowerCase() === exerciseName) || null;
+}
+
+function getSessionByDate(date){
+  return getLogs().filter(e => (e.date || '') === date).sort((a,b)=> (a.order||0) - (b.order||0));
+}
+
+function parseMaybeNumber(value){
+  return parseAdditiveValue(value);
+}
+
+function parseAdditiveValue(value){
+  if (value === null || value === undefined) return NaN;
+  const cleaned = String(value).replace(/,/g,'').trim();
+  if (!cleaned) return NaN;
+  const parts = cleaned.split('+').map(part => part.trim()).filter(Boolean);
+  let total = 0;
+  let found = false;
+  for (const part of parts){
+    const match = part.match(/-?\d+(?:\.\d+)?/);
+    if (match){
+      total += parseFloat(match[0]);
+      found = true;
+    }
+  }
+  return found ? total : NaN;
+}
+
+function getSetScore(set){
+  if (!set) return 0;
+  if (set.singleArm){
+    const left = (parseAdditiveValue(set.leftReps) || 0) * (parseAdditiveValue(set.leftWeight) || 0);
+    const right = (parseAdditiveValue(set.rightReps) || 0) * (parseAdditiveValue(set.rightWeight) || 0);
+    return left + right;
+  }
+  return (parseAdditiveValue(set.reps) || 0) * (parseAdditiveValue(set.weight) || 0);
+}
+
+function getExerciseScore(exercise){
+  if (!exercise || !Array.isArray(exercise.sets)) return 0;
+  return exercise.sets.reduce((sum, set) => sum + (set.dropSet ? 0 : getSetScore(set)), 0);
+}
+
+
+function compareProgress(current, previous){
+  if (!current || !previous) return '';
+  return getExerciseScore(current) > getExerciseScore(previous) ? 'Nice progression!' : '';
+}
+
+
+function findPreviousSameExercise(exerciseName, currentDate, excludeId){
+  const logs = getLogs()
+    .filter(e => e.exercise && e.exercise.toLowerCase() === exerciseName.toLowerCase())
+    .filter(e => e.id !== excludeId)
+    .slice()
+    .sort((a,b)=> ((b.date||'') + (b.order||0) + (b.id||'')).localeCompare((a.date||'') + (a.order||0) + (a.id||'')));
+
+  return logs.find(e => (e.date || '') <= currentDate) || null;
+}
+
+function updatePreviousTargets(){
+  const reference = getReferenceExerciseForCurrentForm();
+  const rows = Array.from(els.setsDetail.querySelectorAll('.set-row'));
+
+  rows.forEach((row, i) => {
+    const prevSet = reference && reference.sets ? reference.sets[i] : null;
+    const setIsSingle = row.querySelector('.toggle-chip').classList.contains('active');
+
+    const setText = (selector, text) => {
+      const el = row.querySelector(selector);
+      if (el) el.textContent = text || '';
+    };
+
+    if (!prevSet) {
+      setText('.prev-reps-target', '');
+      setText('.prev-weight-target', '');
+      setText('.prev-left-reps-target', '');
+      setText('.prev-left-weight-target', '');
+      setText('.prev-right-reps-target', '');
+      setText('.prev-right-weight-target', '');
+      return;
+    }
+
+    if (setIsSingle || prevSet.singleArm) {
+      setText('.prev-reps-target', '');
+      setText('.prev-weight-target', '');
+      setText('.prev-left-reps-target', prevSet.leftReps !== undefined && prevSet.leftReps !== '' ? `Last: ${prevSet.leftReps}` : '');
+      setText('.prev-left-weight-target', prevSet.leftWeight !== undefined && prevSet.leftWeight !== '' ? `Last: ${prevSet.leftWeight}` : '');
+      setText('.prev-right-reps-target', prevSet.rightReps !== undefined && prevSet.rightReps !== '' ? `Last: ${prevSet.rightReps}` : '');
+      setText('.prev-right-weight-target', prevSet.rightWeight !== undefined && prevSet.rightWeight !== '' ? `Last: ${prevSet.rightWeight}` : '');
+    } else {
+      setText('.prev-reps-target', prevSet.reps !== undefined && prevSet.reps !== '' ? `Last: ${prevSet.reps}` : '');
+      setText('.prev-weight-target', prevSet.weight !== undefined && prevSet.weight !== '' ? `Last: ${prevSet.weight}` : '');
+      setText('.prev-left-reps-target', '');
+      setText('.prev-left-weight-target', '');
+      setText('.prev-right-reps-target', '');
+      setText('.prev-right-weight-target', '');
+    }
+  });
+}
+
+function updateProgressNotice(){
+  const exerciseName = els.exerciseName.value.trim();
+  if (!exerciseName){
+    els.progressNotice.textContent = '';
+    els.progressNotice.classList.remove('show');
+    return;
+  }
+  const exercise = buildExercisePreviewFromForm();
+  if (!exercise){
+    els.progressNotice.textContent = '';
+    els.progressNotice.classList.remove('show');
+    return;
+  }
+  const prev = findPreviousSameExercise(exerciseName, exercise.date, editingEntryId);
+  const summary = compareProgress(exercise, prev);
+  if (summary){
+    els.progressNotice.textContent = summary;
+    els.progressNotice.classList.add('show');
+  } else {
+    els.progressNotice.textContent = '';
+    els.progressNotice.classList.remove('show');
+  }
+}
+els.exerciseName.addEventListener('input', ()=>{
+  updatePreviousTargets();
+  updateProgressNotice();
+});
+els.inputDate.addEventListener('input', ()=>{
+  updatePreviousTargets();
+  updateProgressNotice();
+});
+
+
+function collapseExerciseForm(){
+  els.formWrap.classList.remove('open');
+  els.progressNotice.textContent = '';
+  els.progressNotice.classList.remove('show');
+  plusOpen = false;
+  els.plusBtn.classList.remove('open');
+  els.plusMenu.classList.remove('open');
+}
+
+els.closeFormBtn.addEventListener('click', (e)=>{
+  e.preventDefault();
+  e.stopPropagation();
+  collapseExerciseForm();
+});
+
+document.addEventListener('click', (e)=>{
+  const clickedInsideForm = e.target.closest('#session-form-wrap');
+  const clickedPlus = e.target.closest('#plus-btn');
+  const clickedPlusMenu = e.target.closest('#plus-menu');
+
+  if (!els.formWrap.classList.contains('open')) return;
+  if (clickedInsideForm || clickedPlus || clickedPlusMenu) return;
+
+  collapseExerciseForm();
+});
+
+function resetEditor(){
+  editingEntryId = null;
+  sessionDraft = null;
+  clearFormOnly();
+  els.inputDate.value = todayStr();
+  collapseExerciseForm();
+  renderMain();
+}
+
+
+function commitExerciseToLogs(exercise, keepSessionOpen=true){
+  if (!state.logs[activeId]) state.logs[activeId] = [];
+
+  exercise.progressSummary = compareProgress(
+    exercise,
+    findPreviousSameExercise(exercise.exercise, exercise.date, exercise.id)
+  );
+  exercise.createdAt = exercise.createdAt || new Date().toISOString();
+
+  if (editingEntryId){
+    const idx = state.logs[activeId].findIndex(e => e.id === editingEntryId);
+    if (idx !== -1){
+      exercise.order = state.logs[activeId][idx].order || 0;
+      exercise.createdAt = state.logs[activeId][idx].createdAt || exercise.createdAt;
+      state.logs[activeId][idx] = exercise;
+    }
+    editingEntryId = null;
+    sessionDraft = null;
+    saveState();
+    clearFormOnly();
+    collapseExerciseForm();
+    renderMain();
+    return;
+  }
+
+  startSessionIfNeeded();
+  const draft = ensureDraft(activeId, exercise.date);
+  draft.date = exercise.date;
+
+  const sameDayEntries = state.logs[activeId].filter(e => (e.date || '') === exercise.date);
+  exercise.order = sameDayEntries.length;
+
+  state.logs[activeId].push(exercise);
+  draft.entryIds.push(exercise.id);
+  saveState();
+  renderMain();
+
+  els.saveFeedback.classList.add('show');
+  setTimeout(() => {
+    els.saveFeedback.classList.remove('show');
+  }, 1400);
+
+  if (!keepSessionOpen){
+    finalizeSession();
+  } else {
+    clearFormOnly();
+    els.inputDate.value = draft.date || todayStr();
+    collapseExerciseForm();
+    els.logArea.scrollTo({top: 0, behavior: 'smooth'});
+  }
+}
+
+function resetFormForNextExercise(){
+  clearFormOnly();
+  editingEntryId = null;
+  els.inputDate.value = currentDraftDate() || todayStr();
+  els.progressNotice.textContent = '';
+  els.progressNotice.classList.remove('show');
+  openForm();
+}
+
+function saveCurrentExercise(keepSessionOpen=true){
+  const exercise = buildExerciseFromForm();
+  if (!exercise) return false;
+  commitExerciseToLogs(exercise, keepSessionOpen);
+  return true;
+}
+
+els.logExerciseBtn.addEventListener('click', ()=>{
+  saveCurrentExercise(true);
+});
+
+els.exerciseName.addEventListener('keydown', (e)=>{
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    saveCurrentExercise(true);
+  }
+});
+
+
+function finalizeSession(){
+  const draft = getDraft();
+  if (editingEntryId){
+    resetEditor();
+    toggleSidebar(true);
+    return;
+  }
+  if (!draft){
+    toggleSidebar(true);
+    return;
+  }
+
+  const draftEntries = getDraftEntries();
+  const totalSets = draftEntries.reduce((sum, entry) => sum + ((entry.sets || []).filter(set => !set.dropSet).length), 0);
+  let progressedSets = 0;
+  draftEntries.forEach(entry => {
+    const prev = findPreviousSameExercise(entry.exercise, entry.date, entry.id);
+    (entry.sets || []).forEach((set, idx) => {
+      if (set.dropSet) return;
+      const prevSet = prev && prev.sets ? prev.sets[idx] : null;
+      if (prevSet && getSetScore(set) > getSetScore(prevSet)) progressedSets += 1;
+    });
+  });
+
+  clearDraft(activeId);
+  saveState();
+  joinedDraftGroupId = null;
+  sessionDraft = null;
+  clearFormOnly();
+  closePlusMenu();
+  els.inputDate.value = todayStr();
+  renderMain();
+  toggleSidebar(true);
+  alert(`Nice job! You progressed on ${progressedSets}/${totalSets} lifts`);
+}
+
+els.addExerciseBtn.addEventListener('click', ()=>{
+  if (editingEntryId){
+    openForm();
+    return;
+  }
+  startSessionIfNeeded();
+  openForm();
+  els.inputDate.value = currentDraftDate() || todayStr();
+  updatePreviousTargets();
+  updateProgressNotice();
+});
+
+els.endSessionBtn.addEventListener('click', finalizeSession);
+
+els.dupLastExerciseBtn.addEventListener('click', ()=>{
+  const last = getLatestExercise();
+  startSessionIfNeeded();
+  openForm();
+  els.inputDate.value = currentDraftDate() || todayStr();
+
+  if (!last){
+    clearFormOnly();
+    return;
+  }
+
+  editingEntryId = null;
+  els.exerciseName.value = last.exercise || '';
+  els.setsInput.value = (last.sets || []).length || '';
+  buildSetsDetail((last.sets || []).map(s=> {
+    const blank = s.singleArm ? createBlankSet(true) : createBlankSet(false);
+    blank.dropSet = !!s.dropSet;
+    return blank;
+  }));
+  updateProgressNotice();
+});
+
+els.dupLastSessionBtn.addEventListener('click', ()=>{
+  const previousDate = getPreviousSessionDateBefore(todayStr());
+  if (!previousDate) return;
+
+  const lastSession = getSessionByDate(previousDate);
+  if (!lastSession.length) return;
+  if (!state.logs[activeId]) state.logs[activeId] = [];
+  const draft = ensureDraft(activeId, todayStr());
+  joinedDraftGroupId = activeId;
+
+  lastSession.forEach((entry, idx)=>{
+    const newEntry = {
+      id:'entry_' + Date.now() + '_' + idx,
+      date: todayStr(),
+      exercise: entry.exercise,
+      order: state.logs[activeId].filter(e => (e.date || '') === todayStr()).length,
+      createdAt: new Date().toISOString(),
+      progressSummary: '',
+      sets: (entry.sets || []).map(s=> {
+        const blank = s.singleArm ? createBlankSet(true) : createBlankSet(false);
+        blank.dropSet = !!s.dropSet;
+        return blank;
+      })
+    };
+    state.logs[activeId].push(newEntry);
+    draft.entryIds.push(newEntry.id);
+  });
+
+  saveState();
+  renderMain();
+  closePlusMenu();
+});
+
+function saveDraftPreview(){
+  // Draft preview stays in memory only.
+}
+
+
+
+function escapeHtml(str){
+  return String(str ?? '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+els.inputDate.value = todayStr();
+
+renderSidebar();
+renderMain();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('./sw.js');
+      if (reg && reg.update) reg.update();
+    } catch (e) {}
+  });
+}
+</script>
+
+</body>
+</html>
