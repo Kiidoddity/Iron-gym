@@ -1210,11 +1210,12 @@ function createBlankSet(singleArm=false){
 function startSessionIfNeeded(){
   const chosenDate = els.inputDate.value || todayStr();
   if (!sessionDraft){
-    currentSessionDate = currentSessionDate || chosenDate;
+    // No session yet — use the picker date, not a stale currentSessionDate
+    currentSessionDate = chosenDate;
     currentSessionId = currentSessionId || ('session_' + Date.now() + '_' + Math.random().toString(36).slice(2,8));
     sessionDraft = {date: currentSessionDate, sessionId: currentSessionId};
   } else if (!currentSessionDate) {
-    currentSessionDate = sessionDraft.date || chosenDate;
+    currentSessionDate = chosenDate;
     currentSessionId = sessionDraft.sessionId || currentSessionId || ('session_' + Date.now() + '_' + Math.random().toString(36).slice(2,8));
     sessionDraft.date = currentSessionDate;
     sessionDraft.sessionId = currentSessionId;
@@ -1452,7 +1453,7 @@ function normalizeSetValues(set){
 }
 
 function buildExerciseFromForm(){
-  const date = currentSessionDate || els.inputDate.value || todayStr();
+  const date = els.inputDate.value || currentSessionDate || todayStr();
   const exercise = els.exerciseName.value.trim();
   if (!exercise) {
     els.exerciseName.focus();
@@ -1473,7 +1474,7 @@ function buildExerciseFromForm(){
 }
 
 function buildExercisePreviewFromForm(){
-  const date = currentSessionDate || els.inputDate.value || todayStr();
+  const date = els.inputDate.value || currentSessionDate || todayStr();
   const exercise = els.exerciseName.value.trim();
   const setsCount = parseInt(els.setsInput.value, 10);
 
@@ -1707,7 +1708,9 @@ function commitExerciseToLogs(exercise, keepSessionOpen=true){
   }
 
   startSessionIfNeeded();
-  exercise.date = currentSessionDate || exercise.date;
+  // The exercise date comes from the form's date picker — treat it as the source of truth
+  // and sync currentSessionDate to it rather than the other way around
+  currentSessionDate = exercise.date;
   exercise.sessionId = currentSessionId || (sessionDraft && sessionDraft.sessionId) || getEntrySessionId(exercise);
   sessionDraft.date = exercise.date;
   sessionDraft.sessionId = exercise.sessionId;
