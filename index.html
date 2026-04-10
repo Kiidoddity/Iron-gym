@@ -299,7 +299,7 @@ const item=document.createElement(‘div’);
 item.className=‘muscle-item’+(group.id===activeId?’ active’:’’);
 item.dataset.id=group.id;
 item.innerHTML=`<button class="muscle-delete-bg" type="button">Delete</button><div class="muscle-swipe-inner"><span class="muscle-name">${escapeHtml(group.name)}</span><button class="muscle-rename-btn" title="Rename">&#x270E;</button></div>`;
-item.querySelector(’.muscle-swipe-inner’).addEventListener(‘click’,(e)=>{if(e.target.closest(’.muscle-rename-btn’))return;setActive(group.id);if(window.innerWidth<900)toggleSidebar(false);});
+item.querySelector(’.muscle-swipe-inner’).addEventListener(‘click’,(e)=>{if(e.target.closest(’.muscle-rename-btn’)||e.target.closest(’.muscle-delete-bg’))return;setActive(group.id);if(window.innerWidth<900)toggleSidebar(false);});
 item.querySelector(’.muscle-rename-btn’).addEventListener(‘click’,(e)=>{e.stopPropagation();startRenameGroup(group.id,item);});
 attachMuscleSwipe(item,group.id);
 els.muscleList.appendChild(item);
@@ -378,7 +378,7 @@ function openForm(){els.formWrap.classList.add(‘open’);}
 function collapseExerciseForm(){els.formWrap.classList.remove(‘open’);els.progressNotice.textContent=’’;els.progressNotice.classList.remove(‘show’);plusOpen=false;els.plusBtn.classList.remove(‘open’);els.plusMenu.classList.remove(‘open’);}
 function clearFormOnly(){els.exerciseName.value=’’;els.setsInput.value=’’;els.setsDetail.innerHTML=’’;els.progressNotice.classList.remove(‘show’);els.progressNotice.textContent=’’;}
 function openPlusMenu(){plusOpen=true;els.plusBtn.classList.add(‘open’);els.plusMenu.classList.add(‘open’);updatePlusMenuVisibility();}
-function closePlusMenu(){plusOpen=false;els.plusBtn.classList.remove(‘open’);els.plusMenu.classList.remove(‘open’);if(!editingEntryId&&!sessionDraft)els.formWrap.classList.remove(‘open’);}
+function closePlusMenu(){plusOpen=false;els.plusBtn.classList.remove(‘open’);els.plusMenu.classList.remove(‘open’);}
 els.plusBtn.addEventListener(‘click’,(e)=>{e.stopPropagation();plusOpen?closePlusMenu():openPlusMenu();});
 els.plusMenu.addEventListener(‘click’,(e)=>e.stopPropagation());
 function updatePlusMenuVisibility(){const inSession=!!(currentSessionId||currentSessionDate||sessionDraft);const hasPrev=!!getPreviousSessionDateBefore(els.inputDate.value||currentSessionDate||todayStr());if(els.startSessionBtn)els.startSessionBtn.style.display=inSession?‘none’:‘block’;if(els.addExerciseBtn)els.addExerciseBtn.style.display=inSession?‘block’:‘none’;els.dupLastSessionBtn.style.display=(!inSession&&hasPrev)?‘block’:‘none’;}
@@ -415,8 +415,33 @@ function beginEditEntry(id){const entry=getLogs().find(e=>e.id===id);if(!entry)r
 function populateFormFromDraft(){const d=sessionDraft&&!sessionDraft.exercises?sessionDraft:null;if(!d)return;els.inputDate.value=currentSessionDate||d.date||els.inputDate.value||todayStr();els.exerciseName.value=d.exercise||’’;els.setsInput.value=d.sets?d.sets.length:’’;buildSetsDetail(d.sets||[]);}
 function resetEditor(){editingEntryId=null;sessionDraft=null;currentSessionDate=null;currentSessionId=null;clearFormOnly();els.inputDate.value=todayStr();collapseExerciseForm();renderMain();}
 els.closeFormBtn.addEventListener(‘click’,(e)=>{e.preventDefault();e.stopPropagation();collapseExerciseForm();saveUIState();});
-document.addEventListener(‘click’,(e)=>{if(!els.formWrap.classList.contains(‘open’))return;if(e.target.closest(’#session-form-wrap’)||e.target.closest(’#plus-btn’)||e.target.closest(’#plus-menu’))return;collapseExerciseForm();saveUIState();});
-function restoreUIState(){let ui=null;try{ui=JSON.parse(localStorage.getItem(UISTATE_KEY)||‘null’);}catch(e){}if(!ui)return false;if(ui.currentSessionId||ui.currentSessionDate||ui.sessionDraft){currentSessionId=ui.currentSessionId||null;currentSessionDate=ui.currentSessionDate||null;sessionDraft=ui.sessionDraft||null;}editingEntryId=ui.editingEntryId||null;if(ui.activeId&&state.groups.find(g=>g.id===ui.activeId))activeId=ui.activeId;if(ui.sidebarOpen===false)sidebarOpen=false;renderSidebar();renderMain();if(!sidebarOpen)els.sidebar.classList.add(‘collapsed’);const inSession=!!(currentSessionId||currentSessionDate||sessionDraft||editingEntryId);if(ui.formOpen&&inSession){openPlusMenu();openForm();if(ui.formDate)els.inputDate.value=ui.formDate;if(ui.formExercise)els.exerciseName.value=ui.formExercise;if(ui.formSets){els.setsInput.value=ui.formSets;buildSetsDetail(ui.formSetData||[]);}updatePreviousTargets();updateProgressNotice();updatePlusMenuVisibility();}return true;}
+document.addEventListener(‘click’,(e)=>{
+if(!els.formWrap.classList.contains(‘open’)) return;
+if(e.target.closest(’#session-form-wrap’)||e.target.closest(’#plus-btn’)||e.target.closest(’#plus-menu’)||e.target.closest(’#menu-toggle’)||e.target.closest(’#add-muscle-btn’)||e.target.closest(’.muscle-item’)||e.target.closest(’.muscle-delete-bg’)) return;
+collapseExerciseForm();saveUIState();
+});
+function restoreUIState(){
+let ui=null;
+try{ui=JSON.parse(localStorage.getItem(UISTATE_KEY)||‘null’);}catch(e){localStorage.removeItem(UISTATE_KEY);return false;}
+if(!ui) return false;
+try{
+if(ui.currentSessionId||ui.currentSessionDate||ui.sessionDraft){currentSessionId=ui.currentSessionId||null;currentSessionDate=ui.currentSessionDate||null;sessionDraft=ui.sessionDraft||null;}
+editingEntryId=ui.editingEntryId||null;
+if(ui.activeId&&state.groups.find(g=>g.id===ui.activeId)) activeId=ui.activeId;
+if(ui.sidebarOpen===false) sidebarOpen=false;
+renderSidebar();renderMain();
+if(!sidebarOpen) els.sidebar.classList.add(‘collapsed’);
+const inSession=!!(currentSessionId||currentSessionDate||sessionDraft||editingEntryId);
+if(ui.formOpen&&inSession){
+openPlusMenu();openForm();
+if(ui.formDate) els.inputDate.value=ui.formDate;
+if(ui.formExercise) els.exerciseName.value=ui.formExercise;
+if(ui.formSets){els.setsInput.value=ui.formSets;try{buildSetsDetail(ui.formSetData||[]);}catch(e){buildSetsDetail([]);}}
+updatePreviousTargets();updateProgressNotice();updatePlusMenuVisibility();
+}
+return true;
+}catch(e){localStorage.removeItem(UISTATE_KEY);return false;}
+}
 if(!els.inputDate.value)els.inputDate.value=todayStr();
 const restored=restoreUIState();
 if(!restored){renderSidebar();renderMain();}
