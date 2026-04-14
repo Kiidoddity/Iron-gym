@@ -84,12 +84,21 @@
   font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;
   font-weight:500;width:100%;outline:none;padding:1px 0;
 }
+.muscle-confirm{display:flex;align-items:center;gap:6px;padding:8px 16px;white-space:nowrap;width:100%;}
+.muscle-confirm-msg{flex:1;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
+.muscle-confirm-yes{background:var(--accent2);border:none;color:#fff;padding:5px 10px;border-radius:2px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;}
+.muscle-confirm-no{background:none;border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:2px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;}
+.muscle-confirm-no:hover{border-color:var(--text);color:var(--text);}
 #add-muscle-btn{
-  margin:8px 14px 16px;background:none;border:1px dashed var(--border);color:var(--muted);
-  padding:8px;cursor:pointer;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;
-  text-transform:uppercase;transition:all .15s;border-radius:2px;white-space:nowrap;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  margin:4px 14px 16px;padding:10px 14px;
+  background:none;border:none;border-top:1px solid var(--border);
+  color:var(--muted);cursor:pointer;
+  font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;
+  text-transform:uppercase;transition:color .15s;width:calc(100% - 28px);
 }
-#add-muscle-btn:hover{border-color:var(--accent);color:var(--accent);}
+#add-muscle-btn:hover{color:var(--accent);}
+
 
 #main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);min-width:0;}
 
@@ -502,6 +511,7 @@
     </div>
     <div id="muscle-list"></div>
     <button id="add-muscle-btn">+ Add Group</button>
+
   </div>
 
   <div id="main">
@@ -544,6 +554,13 @@
       <div id="composer-actions-row">
         <button class="action-btn danger session-btn" id="delete-session-composer-btn" style="display:none;">Delete Session</button>
         <button class="action-btn danger session-btn" id="end-session-btn" style="display:none;">End Session</button>
+      </div>
+      <div id="confirm-row" style="display:none;flex-direction:column;align-items:center;gap:8px;width:min(420px,100%);">
+        <div id="confirm-msg" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-align:center;"></div>
+        <div style="display:flex;gap:8px;width:100%;">
+          <button class="action-btn" id="confirm-cancel-btn" style="flex:1;">Cancel</button>
+          <button class="action-btn danger" id="confirm-yes-btn" style="flex:1;">Yes, Delete</button>
+        </div>
       </div>
 
       <div id="session-form-wrap">
@@ -696,7 +713,22 @@ function renderSidebar(){
     });
     item.querySelector('.delete').addEventListener('click', (e)=>{
       e.stopPropagation();
-      deleteGroup(group.id);
+      // Swap item content with inline confirm
+      item.innerHTML = `
+        <div class="muscle-confirm">
+          <span class="muscle-confirm-msg">Delete?</span>
+          <button class="muscle-confirm-no">Cancel</button>
+          <button class="muscle-confirm-yes">Delete</button>
+        </div>
+      `;
+      item.querySelector('.muscle-confirm-no').addEventListener('click', (e)=>{
+        e.stopPropagation();
+        renderSidebar();
+      });
+      item.querySelector('.muscle-confirm-yes').addEventListener('click', (e)=>{
+        e.stopPropagation();
+        deleteGroup(group.id);
+      });
     });
     els.muscleList.appendChild(item);
   });
@@ -705,12 +737,13 @@ function renderSidebar(){
 function deleteGroup(id){
   const group = state.groups.find(g=>g.id===id);
   if (!group) return;
-  if (!confirm(`Delete "${group.name}" and all its logs?`)) return;
   state.groups = state.groups.filter(g=>g.id!==id);
   delete state.logs[id];
   if (activeId === id){
     activeId = null;
     sessionDraft = null;
+    currentSessionDate = null;
+    currentSessionId = null;
   }
   saveState();
   renderSidebar();
@@ -797,6 +830,8 @@ function renderMain(){
   buildNameDatalists();
   renderLog();
   updatePlusMenuVisibility();
+  // Always hide confirm row on re-render
+  if(document.getElementById('confirm-row')) document.getElementById('confirm-row').style.display='none';
 }
 
 
@@ -1020,13 +1055,23 @@ function renderLog(){
         ? 'Nice progression!'
         : entry.progressSummary;
 
+      // Only show delete X on exercise if in active or rejoined session
+      const showDeleteEntry = isCurrentOpenSession;
+
       html += `
         <div class="exercise-card" data-entry-id="${entry.id}">
+          <div class="exercise-confirm-bar" id="ec-${entry.id}" style="display:none;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--border);gap:10px;">
+            <span style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);">Delete exercise?</span>
+            <div style="display:flex;gap:6px;">
+              <button class="entry-confirm-no" data-id="${entry.id}" style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:2px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">Cancel</button>
+              <button class="entry-confirm-yes" data-id="${entry.id}" style="background:var(--accent2);border:none;color:#fff;padding:4px 10px;border-radius:2px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">Delete</button>
+            </div>
+          </div>
           <div class="exercise-header">
             <span class="exercise-name">${escapeHtml(entry.exercise || '')}</span>
             <div class="exercise-actions">
               <button class="edit-entry-btn" data-id="${entry.id}" title="Edit">✎</button>
-              <button class="delete-entry-btn" data-id="${entry.id}" title="Delete">✕</button>
+              ${showDeleteEntry ? `<button class="delete-entry-btn" data-id="${entry.id}" title="Delete">✕</button>` : ''}
             </div>
           </div>
           <table class="sets-table">
@@ -1084,62 +1129,90 @@ function renderLog(){
 
   els.logArea.innerHTML = html;
 
+  // Exercise delete — show inline confirm bar inside the card
   els.logArea.querySelectorAll('.delete-entry-btn').forEach(btn=>{
     btn.addEventListener('click', (e)=>{
-      e.preventDefault();
-      e.stopPropagation();
+      e.preventDefault(); e.stopPropagation();
       const id = btn.dataset.id;
-      const entry = getLogs().find(e => e.id === id);
-      const label = entry && entry.exercise ? entry.exercise : 'this exercise';
-      const ok = confirm(`Delete "${label}"?`);
-      if (!ok) return;
-
-      state.logs[activeId] = getLogs().filter(e=>e.id !== id);
-      saveState();
-      renderMain();
+      const bar = document.getElementById(`ec-${id}`);
+      if (bar) bar.style.display = 'flex';
+      btn.style.display = 'none';
+    });
+  });
+  els.logArea.querySelectorAll('.entry-confirm-no').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.preventDefault(); e.stopPropagation();
+      const id = btn.dataset.id;
+      const bar = document.getElementById(`ec-${id}`);
+      if (bar) bar.style.display = 'none';
+      const delBtn = els.logArea.querySelector(`.delete-entry-btn[data-id="${id}"]`);
+      if (delBtn) delBtn.style.display = '';
+    });
+  });
+  els.logArea.querySelectorAll('.entry-confirm-yes').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.preventDefault(); e.stopPropagation();
+      const id = btn.dataset.id;
+      // Remove from all groups in case activeId shifted
+      Object.keys(state.logs).forEach(gid=>{
+        state.logs[gid] = (state.logs[gid]||[]).filter(e=>e.id!==id);
+      });
+      saveState(); renderMain();
     });
   });
 
+  // Session × — replace session block header with inline confirm
   els.logArea.querySelectorAll('.delete-session-btn').forEach(btn=>{
     btn.addEventListener('click', (e)=>{
-      e.preventDefault();
-      e.stopPropagation();
+      e.preventDefault(); e.stopPropagation();
       const sessionId = btn.dataset.sessionId;
       const date = btn.dataset.date;
-      const ok = confirm(`Delete the whole session on ${date}?`);
-      if (!ok) return;
-
-      state.logs[activeId] = getLogs().filter(e => getEntrySessionId(e) !== sessionId);
-      if (currentSessionId === sessionId){
-        currentSessionId = null;
-        currentSessionDate = null;
-        sessionDraft = null;
-      }
-      saveState();
-      renderMain();
+      const shell = btn.closest('.session-shell');
+      if (!shell) return;
+      // Build confirm bar and prepend it, hide the × button
+      const bar = document.createElement('div');
+      bar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--panel);border:1px solid var(--border);border-radius:6px;gap:10px;margin-bottom:6px;';
+      bar.innerHTML = `
+        <span style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);">Delete session?</span>
+        <div style="display:flex;gap:6px;">
+          <button class="sc-no" style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:2px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">Cancel</button>
+          <button class="sc-yes" style="background:var(--accent2);border:none;color:#fff;padding:4px 10px;border-radius:2px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">Delete</button>
+        </div>
+      `;
+      btn.style.display = 'none';
+      shell.insertBefore(bar, shell.firstChild);
+      bar.querySelector('.sc-no').addEventListener('click', (e)=>{
+        e.stopPropagation();
+        bar.remove();
+        btn.style.display = '';
+      });
+      bar.querySelector('.sc-yes').addEventListener('click', (e)=>{
+        e.stopPropagation();
+        Object.keys(state.logs).forEach(gid=>{
+          state.logs[gid] = (state.logs[gid]||[]).filter(e=>getEntrySessionId(e)!==sessionId);
+        });
+        if (currentSessionId === sessionId){
+          currentSessionId = null; currentSessionDate = null; sessionDraft = null;
+        }
+        saveState(); renderMain();
+      });
     });
   });
 
   els.logArea.querySelectorAll('.edit-entry-btn').forEach(btn=>{
     btn.addEventListener('click', (e)=>{
-      e.preventDefault();
-      e.stopPropagation();
-      const id = btn.dataset.id;
-      beginEditEntry(id);
+      e.preventDefault(); e.stopPropagation();
+      beginEditEntry(btn.dataset.id);
     });
   });
 
   els.logArea.querySelectorAll('.rejoin-session-btn').forEach(btn=>{
     btn.addEventListener('click', (e)=>{
-      e.preventDefault();
-      e.stopPropagation();
-      const date = btn.dataset.date;
-      const sessionId = btn.dataset.sessionId;
-      currentSessionDate = date;
-      currentSessionId = sessionId;
-      sessionDraft = {date, sessionId};
-      saveState();
-      renderMain();
+      e.preventDefault(); e.stopPropagation();
+      currentSessionDate = btn.dataset.date;
+      currentSessionId = btn.dataset.sessionId;
+      sessionDraft = {date: currentSessionDate, sessionId: currentSessionId};
+      saveState(); renderMain();
     });
   });
 }
@@ -1222,6 +1295,7 @@ function clearFormOnly(){
   els.setsDetail.innerHTML = '';
   els.progressNotice.classList.remove('show');
   els.progressNotice.textContent = '';
+  _setsCache = [];
 }
 
 function createBlankSet(singleArm=false){
@@ -1288,19 +1362,36 @@ function populateFormFromDraft(){
   buildSetsDetail(draft.sets || []);
 }
 
+// Persistent cache so changing set count never loses filled data
+let _setsCache = [];
+
+function snapshotSetsCache(){
+  const rows = Array.from(els.setsDetail.querySelectorAll('.set-row'));
+  if(rows.length) _setsCache = rows.map(row=>{ try{return readSetRow(row);}catch(e){return createBlankSet(false);} });
+}
+
 function buildSetsDetail(existingSets=null){
   let count = parseInt(els.setsInput.value, 10);
   if (!count || count < 1){
-    els.setsDetail.innerHTML = '';
+    // Don't wipe cache when field is empty mid-edit
+    if(els.setsInput.value !== '') { els.setsDetail.innerHTML=''; _setsCache=[]; }
     return;
   }
   count = Math.min(Math.max(count,1),20);
 
-  const prev = existingSets || Array.from(els.setsDetail.querySelectorAll('.set-row')).map(readSetRow);
+  // Priority: explicit existingSets (from draft) > live cache > DOM snapshot
+  const prev = existingSets || (_setsCache.length ? _setsCache : Array.from(els.setsDetail.querySelectorAll('.set-row')).map(row=>{
+    try{return readSetRow(row);}catch(e){return createBlankSet(false);}
+  }));
+
+  // Merge: keep existing data for rows that exist, blank for new rows
+  const merged = Array.from({length:count}, (_,i) => prev[i] || createBlankSet(false));
+  _setsCache = merged.slice(); // update cache with merged result
+
   els.setsDetail.innerHTML = '';
 
   for (let i=0; i<count; i++){
-    const setData = prev[i] || createBlankSet(false);
+    const setData = merged[i];
     const row = document.createElement('div');
     row.className = 'set-row';
     row.innerHTML = `
@@ -1391,10 +1482,28 @@ function buildSetsDetail(existingSets=null){
     row.querySelectorAll('input').forEach(input=>{
       if (input.type === 'number') attachWheelInput(input);
       input.addEventListener('input', ()=>{
+        snapshotSetsCache();
         updatePreviousTargets();
         updateProgressNotice();
       });
-      input.addEventListener('focus', ()=> input.select());
+      input.addEventListener('focus', ()=>{
+        input.select();
+        // On iOS the keyboard shrinks the visual viewport — scroll the input into view above it
+        setTimeout(()=>{
+          const rect = input.getBoundingClientRect();
+          const vv = window.visualViewport;
+          const viewH = vv ? vv.height : window.innerHeight;
+          // If input bottom is below the visible area, scroll it up with 80px clearance
+          if(rect.bottom > viewH - 20){
+            const scrollEl = document.getElementById('composer-wrap') || document.getElementById('content-wrap');
+            if(scrollEl){
+              scrollEl.scrollBy({top: rect.bottom - viewH + 100, behavior:'smooth'});
+            } else {
+              window.scrollBy({top: rect.bottom - viewH + 100, behavior:'smooth'});
+            }
+          }
+        }, 350); // wait for keyboard animation to finish
+      });
     });
 
     els.setsDetail.appendChild(row);
@@ -1448,7 +1557,10 @@ function readSetRow(row){
   };
 }
 
-els.setsInput.addEventListener('input', ()=> buildSetsDetail());
+els.setsInput.addEventListener('input', ()=>{
+  snapshotSetsCache();
+  buildSetsDetail();
+});
 
 function normalizeSetValues(set){
   if (set.singleArm){
@@ -1857,26 +1969,62 @@ els.addExerciseBtn.addEventListener('click', ()=>{
   updateProgressNotice();
 });
 
-els.endSessionBtn.addEventListener('click', finalizeSession);
+// ── In-app confirm for session actions ───────────────────────────────────────
+const confirmRow = document.getElementById('confirm-row');
+const confirmMsg  = document.getElementById('confirm-msg');
+const confirmYes  = document.getElementById('confirm-yes-btn');
+const confirmCancel = document.getElementById('confirm-cancel-btn');
+let _confirmCallback = null;
+
+function showSessionConfirm(msg, yesLabel, callback){
+  confirmMsg.textContent = msg;
+  confirmYes.textContent = yesLabel;
+  _confirmCallback = callback;
+  confirmRow.style.display = 'flex';
+  // Hide the main session buttons while confirming
+  els.endSessionBtn.style.display = 'none';
+  els.deleteSessionComposerBtn.style.display = 'none';
+}
+function hideSessionConfirm(){
+  confirmRow.style.display = 'none';
+  _confirmCallback = null;
+  // Restore buttons
+  const inSession = !!(currentSessionId || currentSessionDate || sessionDraft);
+  const inRealSession = inSession && !editingEntryId;
+  els.endSessionBtn.style.display = inSession ? 'block' : 'none';
+  els.deleteSessionComposerBtn.style.display = inRealSession ? 'block' : 'none';
+}
+confirmYes.addEventListener('click', ()=>{
+  const cb = _confirmCallback;
+  hideSessionConfirm();
+  if(cb) cb();
+});
+confirmCancel.addEventListener('click', hideSessionConfirm);
+
+els.endSessionBtn.addEventListener('click', ()=>{
+  showSessionConfirm('End this session?', 'Yes, End', finalizeSession);
+});
 
 els.deleteSessionComposerBtn.addEventListener('click', ()=>{
-  const sessionId = currentSessionId || (sessionDraft && sessionDraft.sessionId);
-  if (sessionId){
-    Object.keys(state.logs).forEach(gid => {
-      state.logs[gid] = (state.logs[gid] || []).filter(e => getEntrySessionId(e) !== sessionId);
-    });
-  }
-  sessionDraft = null;
-  currentSessionDate = null;
-  currentSessionId = null;
-  editingEntryId = null;
-  clearFormOnly();
-  closePlusMenu();
-  els.inputDate.value = todayStr();
-  saveState();
-  saveUIState();
-  renderMain();
-  toggleSidebar(true);
+  showSessionConfirm('Delete this session?', 'Yes, Delete', ()=>{
+    const sessionId = currentSessionId || (sessionDraft && sessionDraft.sessionId);
+    if (sessionId){
+      Object.keys(state.logs).forEach(gid => {
+        state.logs[gid] = (state.logs[gid] || []).filter(e => getEntrySessionId(e) !== sessionId);
+      });
+    }
+    sessionDraft = null;
+    currentSessionDate = null;
+    currentSessionId = null;
+    editingEntryId = null;
+    clearFormOnly();
+    closePlusMenu();
+    els.inputDate.value = todayStr();
+    saveState();
+    saveUIState();
+    renderMain();
+    toggleSidebar(true);
+  });
 });
 
 els.dupLastSessionBtn.addEventListener('click', ()=>{
@@ -2001,6 +2149,23 @@ if(!_restored){ renderSidebar(); renderMain(); }
 </script>
 
 <script>
+// ── Keep composer above keyboard on iOS ──────────────────────────────────────
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', ()=>{
+    const composerWrap = document.getElementById('composer-wrap');
+    if(!composerWrap) return;
+    const vv = window.visualViewport;
+    // When keyboard is up, vv.height < window.innerHeight
+    // Scroll the active input into view
+    const focused = document.activeElement;
+    if(focused && composerWrap.contains(focused)){
+      setTimeout(()=>{
+        focused.scrollIntoView({behavior:'smooth', block:'center'});
+      }, 100);
+    }
+  });
+}
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
