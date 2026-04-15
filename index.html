@@ -69,7 +69,7 @@
 }
 .muscle-item:hover{background:var(--active);}
 .muscle-item.active{background:var(--active);border-left-color:var(--accent);}
-.muscle-name{flex:1;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;font-weight:500;}
+.muscle-name{flex:1;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;font-weight:500;}
 .muscle-item.active .muscle-name{color:var(--accent);}
 .side-actions{display:flex;align-items:center;gap:4px;opacity:0;transition:opacity .15s;}
 .muscle-item:hover .side-actions{opacity:1;}
@@ -222,7 +222,15 @@
 }
 .exercise-header{
   display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--border);gap:12px;
+  user-select:none;
 }
+.drag-handle{
+  color:var(--border);font-size:14px;cursor:grab;padding:0 6px 0 0;flex-shrink:0;
+  touch-action:none;letter-spacing:1px;
+}
+.drag-handle:active{cursor:grabbing;color:var(--muted);}
+.exercise-card.dragging{opacity:0.4;border-color:var(--accent);}
+.exercise-card.drag-over{border-top:2px solid var(--accent);}
 .exercise-name{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;font-weight:500;min-width:0;flex:1;}
 .exercise-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}
 .edit-entry-btn,.delete-entry-btn{
@@ -236,6 +244,14 @@
 }
 .sets-table td{padding:6px 14px;font-size:13px;border-top:1px solid var(--border);vertical-align:top;}
 .sets-table td:first-child{color:var(--muted);font-size:10px;}
+.quick-edit{
+  background:none;border:none;border-bottom:1px solid transparent;
+  color:var(--text);font-family:'DM Mono',monospace;font-size:13px;
+  width:60px;padding:0 2px;text-align:left;outline:none;cursor:pointer;
+  transition:border-color .15s;
+}
+.quick-edit:focus{border-bottom-color:var(--accent);cursor:text;background:rgba(232,255,71,.05);}
+.quick-edit.empty{color:var(--muted);}
 .arm-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
 .arm-box{display:flex;gap:6px;align-items:center;white-space:nowrap;}
 .arm-tag{font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;}
@@ -1068,6 +1084,7 @@ function renderLog(){
             </div>
           </div>
           <div class="exercise-header">
+            ${isCurrentOpenSession ? `<span class="drag-handle" data-id="${entry.id}" title="Hold to reorder">⠿</span>` : ''}
             <span class="exercise-name">${escapeHtml(entry.exercise || '')}</span>
             <div class="exercise-actions">
               <button class="edit-entry-btn" data-id="${entry.id}" title="Edit">✎</button>
@@ -1086,26 +1103,49 @@ function renderLog(){
           : '';
 
         if (set.singleArm){
-          html += `
-            <tr>
-              <td>${i+1}</td>
-              <td>
-                <div class="arm-grid">
-                  <div class="arm-box"><span class="arm-tag">L</span><span>${set.leftReps ?? '—'}</span></div>
-                  <div class="arm-box"><span class="arm-tag">R</span><span>${set.rightReps ?? '—'}</span></div>
-                </div>
-                ${extraDrop}
-              </td>
-              <td>
-                <div class="arm-grid">
-                  <div class="arm-box"><span class="arm-tag">L</span><span>${formatLoggedWeight(set.leftWeight)}</span></div>
-                  <div class="arm-box"><span class="arm-tag">R</span><span>${formatLoggedWeight(set.rightWeight)}</span></div>
-                </div>
-              </td>
-            </tr>
-          `;
+          if(isCurrentOpenSession){
+            html += `
+              <tr>
+                <td>${i+1}</td>
+                <td>
+                  <div class="arm-grid">
+                    <div class="arm-box"><span class="arm-tag">L</span><input class="quick-edit ${!set.leftReps?'empty':''}" data-entry="${entry.id}" data-set="${i}" data-field="leftReps" value="${escapeHtml(set.leftReps??'')}" placeholder="—" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
+                    <div class="arm-box"><span class="arm-tag">R</span><input class="quick-edit ${!set.rightReps?'empty':''}" data-entry="${entry.id}" data-set="${i}" data-field="rightReps" value="${escapeHtml(set.rightReps??'')}" placeholder="—" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
+                  </div>${extraDrop}
+                </td>
+                <td>
+                  <div class="arm-grid">
+                    <div class="arm-box"><span class="arm-tag">L</span><input class="quick-edit ${!set.leftWeight?'empty':''}" data-entry="${entry.id}" data-set="${i}" data-field="leftWeight" value="${escapeHtml(set.leftWeight??'')}" placeholder="—" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
+                    <div class="arm-box"><span class="arm-tag">R</span><input class="quick-edit ${!set.rightWeight?'empty':''}" data-entry="${entry.id}" data-set="${i}" data-field="rightWeight" value="${escapeHtml(set.rightWeight??'')}" placeholder="—" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
+                  </div>
+                </td>
+              </tr>
+            `;
+          } else {
+            html += `
+              <tr>
+                <td>${i+1}</td>
+                <td>
+                  <div class="arm-grid">
+                    <div class="arm-box"><span class="arm-tag">L</span><span>${set.leftReps ?? '—'}</span></div>
+                    <div class="arm-box"><span class="arm-tag">R</span><span>${set.rightReps ?? '—'}</span></div>
+                  </div>${extraDrop}
+                </td>
+                <td>
+                  <div class="arm-grid">
+                    <div class="arm-box"><span class="arm-tag">L</span><span>${formatLoggedWeight(set.leftWeight)}</span></div>
+                    <div class="arm-box"><span class="arm-tag">R</span><span>${formatLoggedWeight(set.rightWeight)}</span></div>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }
         } else {
-          html += `<tr><td>${i+1}</td><td>${set.reps ?? '—'}${extraDrop}</td><td>${formatLoggedWeight(set.weight)}</td></tr>`;
+          if(isCurrentOpenSession){
+            html += `<tr><td>${i+1}</td><td><input class="quick-edit ${!set.reps?'empty':''}" data-entry="${entry.id}" data-set="${i}" data-field="reps" value="${escapeHtml(set.reps??'')}" placeholder="—" inputmode="decimal" autocomplete="off" spellcheck="false">${extraDrop}</td><td><input class="quick-edit ${!set.weight?'empty':''}" data-entry="${entry.id}" data-set="${i}" data-field="weight" value="${escapeHtml(set.weight??'')}" placeholder="—" inputmode="decimal" autocomplete="off" spellcheck="false"></td></tr>`;
+          } else {
+            html += `<tr><td>${i+1}</td><td>${set.reps ?? '—'}${extraDrop}</td><td>${formatLoggedWeight(set.weight)}</td></tr>`;
+          }
         }
       });
 
@@ -1128,6 +1168,28 @@ function renderLog(){
   });
 
   els.logArea.innerHTML = html;
+
+  // Quick-edit: save reps/weight directly in the log table
+  els.logArea.querySelectorAll('.quick-edit').forEach(input=>{
+    input.addEventListener('focus', ()=>{ input.select(); });
+    const save = ()=>{
+      const entryId = input.dataset.entry;
+      const setIdx = parseInt(input.dataset.set, 10);
+      const field = input.dataset.field;
+      const val = input.value.trim();
+      const logs = state.logs[activeId];
+      if(!logs) return;
+      const entry = logs.find(e=>e.id===entryId);
+      if(!entry || !entry.sets[setIdx]) return;
+      entry.sets[setIdx][field] = val;
+      // Recompute progression
+      entry.progressSummary = compareProgress(entry, findPreviousSameExercise(entry.exercise, entry.date, entry.id));
+      input.classList.toggle('empty', !val);
+      saveState();
+    };
+    input.addEventListener('blur', save);
+    input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); input.blur(); } });
+  });
 
   // Exercise delete — show inline confirm bar inside the card
   els.logArea.querySelectorAll('.delete-entry-btn').forEach(btn=>{
@@ -1213,6 +1275,92 @@ function renderLog(){
       currentSessionId = btn.dataset.sessionId;
       sessionDraft = {date: currentSessionDate, sessionId: currentSessionId};
       saveState(); renderMain();
+    });
+  });
+
+  // ── Touch drag-to-reorder exercise cards ──────────────────────────────────
+  attachDragReorder();
+}
+
+function attachDragReorder(){
+  const handles = Array.from(els.logArea.querySelectorAll('.drag-handle'));
+  if(!handles.length) return;
+
+  let dragCard = null, dragId = null, startY = 0, originIndex = 0;
+  let placeholder = null;
+
+  function getCards(){
+    return Array.from(els.logArea.querySelectorAll('.exercise-card[data-entry-id]'));
+  }
+
+  handles.forEach(handle => {
+    handle.addEventListener('touchstart', (e)=>{
+      e.stopPropagation();
+      dragId = handle.dataset.id;
+      dragCard = handle.closest('.exercise-card');
+      if(!dragCard) return;
+      startY = e.touches[0].clientY;
+      originIndex = getCards().indexOf(dragCard);
+      dragCard.classList.add('dragging');
+
+      // Create placeholder
+      placeholder = document.createElement('div');
+      placeholder.style.cssText = `height:${dragCard.offsetHeight}px;background:transparent;border:1px dashed var(--border);border-radius:4px;margin-bottom:8px;`;
+      dragCard.parentNode.insertBefore(placeholder, dragCard.nextSibling);
+    },{passive:true});
+
+    handle.addEventListener('touchmove', (e)=>{
+      if(!dragCard) return;
+      e.preventDefault();
+      const dy = e.touches[0].clientY - startY;
+      dragCard.style.transform = `translateY(${dy}px)`;
+      dragCard.style.position = 'relative';
+      dragCard.style.zIndex = '100';
+
+      // Find which card we're hovering over
+      const cards = getCards().filter(c => c !== dragCard);
+      const touchY = e.touches[0].clientY;
+      let insertBefore = null;
+      for(const card of cards){
+        const rect = card.getBoundingClientRect();
+        if(touchY < rect.top + rect.height / 2){
+          insertBefore = card;
+          break;
+        }
+      }
+      // Move placeholder
+      if(insertBefore){
+        insertBefore.parentNode.insertBefore(placeholder, insertBefore);
+      } else {
+        const parent = dragCard.parentNode;
+        if(parent) parent.appendChild(placeholder);
+      }
+    },{passive:false});
+
+    handle.addEventListener('touchend', ()=>{
+      if(!dragCard) return;
+      dragCard.style.transform = '';
+      dragCard.style.position = '';
+      dragCard.style.zIndex = '';
+      dragCard.classList.remove('dragging');
+
+      // Move card to placeholder position
+      if(placeholder && placeholder.parentNode){
+        placeholder.parentNode.insertBefore(dragCard, placeholder);
+        placeholder.remove();
+      }
+
+      // Reorder in state by reading DOM order
+      const newOrder = getCards().map(c => c.dataset.entryId);
+      if(activeId && state.logs[activeId]){
+        newOrder.forEach((id, idx) => {
+          const entry = state.logs[activeId].find(e => e.id === id);
+          if(entry) entry.order = idx;
+        });
+        saveState();
+      }
+
+      dragCard = null; dragId = null; placeholder = null;
     });
   });
 }
@@ -1930,11 +2078,24 @@ function finalizeSession(){
   clearFormOnly();
   closePlusMenu();
   els.inputDate.value = todayStr();
+  saveState();
+  saveUIState();
   renderMain();
   toggleSidebar(true);
 
   if (progressedSets > 0){
-    alert(`Nice job! You progressed on ${progressedSets}/${totalSets} lifts`);
+    // Show "Good workout!" banner in log area instead of alert
+    const banner = document.createElement('div');
+    banner.style.cssText = 'color:var(--green);font-size:11px;letter-spacing:2px;text-transform:uppercase;text-align:center;padding:14px;animation:fadeIn .3s ease;';
+    banner.textContent = `Good workout! ${progressedSets}/${totalSets} lifts improved`;
+    els.logArea.insertBefore(banner, els.logArea.firstChild);
+    setTimeout(()=> banner.remove(), 4000);
+  } else {
+    const banner = document.createElement('div');
+    banner.style.cssText = 'color:var(--green);font-size:11px;letter-spacing:2px;text-transform:uppercase;text-align:center;padding:14px;animation:fadeIn .3s ease;';
+    banner.textContent = 'Good workout!';
+    els.logArea.insertBefore(banner, els.logArea.firstChild);
+    setTimeout(()=> banner.remove(), 3000);
   }
 }
 
@@ -1955,13 +2116,38 @@ els.startSessionBtn.addEventListener('click', ()=>{
 
 els.addExerciseBtn.addEventListener('click', ()=>{
   if (editingEntryId){
-    openForm();
+    // Show in-app prompt to save the open edit before opening a fresh form
+    showSessionConfirm('Save last edited exercise?', 'Yes, Save', ()=>{
+      saveCurrentExercise(true);
+      // After saving, open fresh form
+      editingEntryId = null;
+      clearFormOnly();
+      const chosenDate = currentDraftDate() || currentSessionDate || todayStr();
+      els.inputDate.value = chosenDate;
+      openPlusMenu(); openForm();
+      updatePreviousTargets(); updateProgressNotice();
+    });
+    // Also wire the cancel to just discard the edit and open fresh
+    // Override: replace confirmYes label and add a "Discard" option via cancel
+    document.getElementById('confirm-cancel-btn').textContent = 'Discard & New';
+    const origCancel = document.getElementById('confirm-cancel-btn');
+    const freshHandler = ()=>{
+      origCancel.textContent = 'Cancel';
+      origCancel.removeEventListener('click', freshHandler);
+      // Restore cancel to original
+      editingEntryId = null;
+      clearFormOnly();
+      const chosenDate = currentDraftDate() || currentSessionDate || todayStr();
+      els.inputDate.value = chosenDate;
+      hideSessionConfirm();
+      openPlusMenu(); openForm();
+      updatePreviousTargets(); updateProgressNotice();
+    };
+    origCancel.addEventListener('click', freshHandler, {once:true});
     return;
   }
   const chosenDate = els.inputDate.value || todayStr();
-  if (!currentSessionDate) {
-    currentSessionDate = chosenDate;
-  }
+  if (!currentSessionDate) currentSessionDate = chosenDate;
   startSessionIfNeeded();
   openForm();
   els.inputDate.value = currentDraftDate() || currentSessionDate || chosenDate;
