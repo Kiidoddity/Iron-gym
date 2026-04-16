@@ -1220,6 +1220,8 @@ function renderLog(){
   els.logArea.querySelectorAll('.quick-edit').forEach(input=>{
     input.addEventListener('focus', ()=>{
       input.select();
+      // Hide composer so it doesn't jump around during keyboard open
+      els.composerWrap.style.display = 'none';
       setTimeout(()=>{ input.scrollIntoView({block:'center', behavior:'smooth'}); }, 100);
     });
     const save = ()=>{
@@ -1232,12 +1234,15 @@ function renderLog(){
       const entry = logs.find(e=>e.id===entryId);
       if(!entry || !entry.sets[setIdx]) return;
       entry.sets[setIdx][field] = val;
-      // Recompute progression
       entry.progressSummary = compareProgress(entry, findPreviousSameExercise(entry.exercise, entry.date, entry.id));
       input.classList.toggle('empty', !val);
       saveState();
     };
-    input.addEventListener('blur', save);
+    input.addEventListener('blur', ()=>{
+      save();
+      // Restore composer after keyboard closes
+      els.composerWrap.style.display = '';
+    });
     input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); input.blur(); } });
   });
 
