@@ -582,7 +582,7 @@
         </div>
 
         <div class="form-row">
-          <input type="text" id="exercise-name-input" class="field" placeholder="" list="exercise-name-list" autocomplete="off">
+          <input type="text" id="exercise-name-input" class="field" placeholder="" list="exercise-name-list" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
         </div>
         <datalist id="exercise-name-list"></datalist>
         <datalist id="drop-set-name-list"></datalist>
@@ -590,7 +590,7 @@
         <div class="inline-grid">
           <div class="sets-box">
             <label class="mini-label">Sets</label>
-            <input type="number" id="sets-input" class="num-input" min="1" max="20" placeholder="">
+            <input type="number" id="sets-input" class="num-input" min="1" max="8" placeholder="">
           </div>
         </div>
 
@@ -935,9 +935,12 @@ function buildNameDatalists(){
 
 function parseExpressionSum(value){
   if (value === null || value === undefined) return 0;
-  const matches = String(value).replace(/,/g, '').match(/-?\d+(?:\.\d+)?/g);
+  // Strip trailing 's' (e.g. "70s" → "70"), remove commas
+  var str = String(value).replace(/,/g, '').replace(/s$/i, '').trim();
+  // If contains '+', sum all numbers in the expression
+  var matches = str.match(/-?\d+(?:\.\d+)?/g);
   if (!matches) return 0;
-  return matches.map(Number).reduce((a,b)=>a+b,0);
+  return matches.map(Number).reduce(function(a,b){ return a+b; }, 0);
 }
 
 function setVolume(set){
@@ -1611,7 +1614,7 @@ function buildSetsDetail(existingSets=null){
     if(els.setsInput.value !== '') { els.setsDetail.innerHTML=''; _setsCache=[]; }
     return;
   }
-  count = Math.min(Math.max(count,1),20);
+  count = Math.min(Math.max(count,1),8);
 
   // Priority: explicit existingSets (from draft) > live cache > DOM snapshot
   const prev = existingSets || (_setsCache.length ? _setsCache : Array.from(els.setsDetail.querySelectorAll('.set-row')).map(row=>{
@@ -1685,10 +1688,12 @@ function buildSetsDetail(existingSets=null){
           <div class="input-block">
             <label class="mini-label">Reps</label>
             <input type="text" class="num-input drop-reps-input" value="${setData.dropReps || ''}" placeholder="" inputmode="text" autocapitalize="off" autocomplete="off" spellcheck="false">
+            <div class="prev-target prev-drop-reps-target"></div>
           </div>
           <div class="input-block">
             <label class="mini-label">Weight</label>
             <input type="text" class="num-input drop-weight-input" value="${setData.dropWeight || ''}" placeholder="" inputmode="text" autocapitalize="off" autocomplete="off" spellcheck="false">
+            <div class="prev-target prev-drop-weight-target"></div>
           </div>
         </div>
       </div>
@@ -1940,17 +1945,31 @@ function updatePreviousTargets(){
     if (setIsSingle || prevSet.singleArm) {
       setText('.prev-reps-target', '');
       setText('.prev-weight-target', '');
-      setText('.prev-left-reps-target', prevSet.leftReps !== undefined && prevSet.leftReps !== '' ? `Last: ${prevSet.leftReps}` : '');
-      setText('.prev-left-weight-target', prevSet.leftWeight !== undefined && prevSet.leftWeight !== '' ? `Last: ${prevSet.leftWeight}` : '');
-      setText('.prev-right-reps-target', prevSet.rightReps !== undefined && prevSet.rightReps !== '' ? `Last: ${prevSet.rightReps}` : '');
-      setText('.prev-right-weight-target', prevSet.rightWeight !== undefined && prevSet.rightWeight !== '' ? `Last: ${prevSet.rightWeight}` : '');
+      setText('.prev-left-reps-target', prevSet.leftReps !== undefined && prevSet.leftReps !== '' ? 'Last: ' + prevSet.leftReps : '');
+      setText('.prev-left-weight-target', prevSet.leftWeight !== undefined && prevSet.leftWeight !== '' ? 'Last: ' + prevSet.leftWeight : '');
+      setText('.prev-right-reps-target', prevSet.rightReps !== undefined && prevSet.rightReps !== '' ? 'Last: ' + prevSet.rightReps : '');
+      setText('.prev-right-weight-target', prevSet.rightWeight !== undefined && prevSet.rightWeight !== '' ? 'Last: ' + prevSet.rightWeight : '');
     } else {
-      setText('.prev-reps-target', prevSet.reps !== undefined && prevSet.reps !== '' ? `Last: ${prevSet.reps}` : '');
-      setText('.prev-weight-target', prevSet.weight !== undefined && prevSet.weight !== '' ? `Last: ${prevSet.weight}` : '');
+      setText('.prev-reps-target', prevSet.reps !== undefined && prevSet.reps !== '' ? 'Last: ' + prevSet.reps : '');
+      setText('.prev-weight-target', prevSet.weight !== undefined && prevSet.weight !== '' ? 'Last: ' + prevSet.weight : '');
       setText('.prev-left-reps-target', '');
       setText('.prev-left-weight-target', '');
       setText('.prev-right-reps-target', '');
       setText('.prev-right-weight-target', '');
+    }
+
+    // Drop set prev targets — look up by drop name
+    const dropNameInput = row.querySelector('.drop-name-input');
+    const dropName = dropNameInput ? dropNameInput.value.trim() : (prevSet.dropName || '');
+    if(dropName){
+      const exerciseName = els.exerciseName.value.trim();
+      const currentDate = els.inputDate.value || todayStr();
+      const prevDrop = findPreviousDropMatch(exerciseName, dropName, currentDate, editingEntryId);
+      setText('.prev-drop-reps-target', prevDrop && prevDrop.dropReps ? 'Last: ' + prevDrop.dropReps : '');
+      setText('.prev-drop-weight-target', prevDrop && prevDrop.dropWeight ? 'Last: ' + prevDrop.dropWeight : '');
+    } else {
+      setText('.prev-drop-reps-target', '');
+      setText('.prev-drop-weight-target', '');
     }
   });
 }
@@ -1984,6 +2003,23 @@ function updateProgressNotice(){
 els.exerciseName.addEventListener('input', ()=>{
   updatePreviousTargets();
   updateProgressNotice();
+});
+
+els.exerciseName.addEventListener('change', ()=>{
+  // Fires when user selects from datalist
+  const name = els.exerciseName.value.trim();
+  if(!name || editingEntryId) return;
+  const prev = findPreviousSameExercise(name, els.inputDate.value || todayStr(), null);
+  if(!prev || !prev.sets || !prev.sets.length) return;
+  // Only prompt if sets aren't already filled
+  const setsCount = parseInt(els.setsInput.value, 10);
+  if(setsCount) return; // already set
+  showSessionConfirm('Duplicate sets from last ' + name + '?', 'Yes, Duplicate', ()=>{
+    els.setsInput.value = prev.sets.length;
+    buildSetsDetail(prev.sets.map(s => JSON.parse(JSON.stringify(s))));
+    updatePreviousTargets();
+    updateProgressNotice();
+  });
 });
 els.inputDate.addEventListener('input', ()=>{
   const chosenDate = els.inputDate.value || todayStr();
@@ -2132,17 +2168,14 @@ function finalizeSession(){
   const sessionId = currentSessionId || (sessionDraft && sessionDraft.sessionId) || null;
   const entries = sessionId ? getSessionEntries(sessionId) : [];
 
-  let totalSets = 0;
-  let progressedSets = 0;
+  let progressedLifts = 0;
 
   entries.forEach(entry => {
     const prevExercise = findPreviousSameExercise(entry.exercise || '', entry.date || '', entry.id);
-    (entry.sets || []).forEach((set, i) => {
-      if (set.dropSet) return;
-      totalSets += 1;
-      const prevSet = prevExercise && prevExercise.sets ? prevExercise.sets[i] : null;
-      if (prevSet && setProgressed(set, prevSet)) progressedSets += 1;
-    });
+    if(!prevExercise) return;
+    const currentVol = exerciseVolume(entry);
+    const prevVol = exerciseVolume(prevExercise);
+    if(currentVol > prevVol) progressedLifts += 1;
   });
 
   sessionDraft = null;
@@ -2156,11 +2189,10 @@ function finalizeSession(){
   renderMain();
   toggleSidebar(true);
 
-  if (progressedSets > 0){
-    // Show "Good workout!" banner in log area instead of alert
+  if (progressedLifts > 0){
     const banner = document.createElement('div');
     banner.style.cssText = 'color:var(--green);font-size:11px;letter-spacing:2px;text-transform:uppercase;text-align:center;padding:14px;animation:fadeIn .3s ease;';
-    banner.textContent = `Good workout! ${progressedSets}/${totalSets} lifts improved`;
+    banner.textContent = 'Nice job! You progressed in ' + progressedLifts + ' lift' + (progressedLifts === 1 ? '' : 's') + '!';
     els.logArea.insertBefore(banner, els.logArea.firstChild);
     setTimeout(()=> banner.remove(), 4000);
   } else {
@@ -2472,7 +2504,7 @@ attachDragReorder();
 // When the keyboard appears, iOS shrinks visualViewport.height.
 // We shift the entire app up by the keyboard height so the focused input stays visible.
 
-const appEl = document.body;
+const appEl = document.getElementById('main') || document.body;
 let _kbOpen = false;
 
 if(window.visualViewport){
@@ -2483,9 +2515,9 @@ if(window.visualViewport){
 
     if(kbH > 100){
       _kbOpen = true;
+      // Shrink #main to visible height so nothing sits behind keyboard
       appEl.style.height = vv.height + 'px';
-      appEl.style.overflow = 'hidden';
-      // Give the layout a frame to settle then scroll focused input into view
+      appEl.style.maxHeight = vv.height + 'px';
       requestAnimationFrame(()=>{
         const focused = document.activeElement;
         if(focused && focused.tagName === 'INPUT'){
@@ -2495,7 +2527,7 @@ if(window.visualViewport){
     } else {
       _kbOpen = false;
       appEl.style.height = '';
-      appEl.style.overflow = '';
+      appEl.style.maxHeight = '';
     }
   });
 }
