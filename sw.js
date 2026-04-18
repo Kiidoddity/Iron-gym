@@ -6,22 +6,20 @@ const STATIC_ASSETS = [
 ‘./icons/icon-512-maskable.png’
 ];
 
-// On install: pre-cache only static assets (not HTML)
 self.addEventListener(‘install’, event => {
 event.waitUntil(
 caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
 );
-self.skipWaiting(); // activate immediately
+self.skipWaiting();
 });
 
-// On activate: clear old caches
 self.addEventListener(‘activate’, event => {
 event.waitUntil(
 caches.keys().then(keys =>
 Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))
 )
 );
-self.clients.claim(); // take control immediately
+self.clients.claim();
 });
 
 self.addEventListener(‘fetch’, event => {
@@ -34,10 +32,9 @@ url.pathname === ‘/’ ||
 url.pathname.endsWith(’/’);
 
 if (isHTML) {
-// Network-first for HTML: always try to get fresh version,
-// fall back to cache only if offline
+// Network-first for HTML: always fetch fresh, fall back to cache if offline
 event.respondWith(
-fetch(event.request)
+fetch(event.request, { cache: ‘no-store’ })
 .then(response => {
 const copy = response.clone();
 caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
@@ -46,7 +43,7 @@ return response;
 .catch(() => caches.match(event.request))
 );
 } else {
-// Cache-first for everything else (icons, fonts, etc.)
+// Cache-first for static assets
 event.respondWith(
 caches.match(event.request).then(cached => {
 if (cached) return cached;
